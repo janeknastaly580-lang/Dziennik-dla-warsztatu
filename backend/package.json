@@ -1,0 +1,25 @@
+{
+  "name": "warsztat-panel-administratora",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Panel administratora systemu warsztatu: dostep mechanikow, kwarantanna, kopie zapasowe",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "kopia": "node scripts/kopia-zapasowa.js",
+    "przywroc": "node scripts/przywroc-kopie.js",
+    "skanuj": "node scripts/skanuj-sekrety.js",
+    "migruj": "node scripts/migruj-do-supabase.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.2.0"
+  }
+}

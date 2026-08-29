@@ -1,0 +1,28 @@
+# zaleznosci
+node_modules/
+
+# konfiguracja lokalna - TU SIEDZI KLUCZ service_role (ryzyko A2)
+backend/.env
+.env
+.env.local
+
+# kopie zapasowe - zawieraja pelna baze klientow, nie trafiaja do repozytorium
+kopie/
+
+# stara, lokalna baza SQLite i zalaczniki (do jednorazowej migracji)
+dane/*.db
+dane/*.db-wal
+dane/*.db-shm
+dane/pliki/*
+!dane/pliki/.gitkeep
+
+# Expo
+frontend/.expo/
+frontend/dist/
+frontend/expo-env.d.ts
+frontend/android/
+frontend/ios/
+
+# systemowe
+.DS_Store
+*.log
