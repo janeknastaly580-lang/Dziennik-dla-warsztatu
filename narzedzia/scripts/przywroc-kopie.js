@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 
-import { SUPABASE_URL, SERVICE_ROLE_KEY, brakiKonfiguracji } from '../src/config.js';
+import { SUPABASE_URL, SERVICE_ROLE_KEY, wymagajKonfiguracji } from '../src/config.js';
 import { TABELE } from './kopia-zapasowa.js';
 
 /** Kolumny generowane przez baze - nie da sie ich wstawic wprost. */
@@ -65,11 +65,7 @@ async function main() {
     console.error('Uzycie: npm run przywroc -- <plik-kopii.json> [--na-sucho]');
     process.exit(1);
   }
-  const braki = brakiKonfiguracji().filter((b) => b !== 'HASLO_PANELU');
-  if (braki.length) {
-    console.error(`Brakuje w backend/.env: ${braki.join(', ')}`);
-    process.exit(1);
-  }
+  wymagajKonfiguracji();
 
   const kopia = JSON.parse(fs.readFileSync(sciezka, 'utf8'));
   console.log(`Kopia z ${kopia.kiedy}, zrodlo: ${kopia.zrodlo}`);

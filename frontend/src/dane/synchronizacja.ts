@@ -249,7 +249,13 @@ async function pobierzWszystko(token: string): Promise<void> {
       await ustawMeta('warsztat_prefiks', odp.warsztat.prefiks);
       await ustawMeta('okno_dni', String(odp.warsztat.okno_dni));
     }
-    if (odp.mechanik) await ustawMeta('mechanik_imie', odp.mechanik.imie);
+    if (odp.mechanik) {
+      await ustawMeta('mechanik_imie', odp.mechanik.imie);
+      // Odebranie uprawnien administratora ma dzialac natychmiast - dlatego
+      // rola przychodzi z serwera przy kazdym pobraniu, a nie tylko raz,
+      // przy parowaniu.
+      await ustawMeta('rola', odp.mechanik.rola ?? 'mechanik');
+    }
     if (odp.wygasniecie_offline_dni) {
       await ustawMeta('wygasniecie_offline_dni', String(odp.wygasniecie_offline_dni));
     }

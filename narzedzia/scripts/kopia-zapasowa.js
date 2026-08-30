@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { KATALOG_KOPII, SUPABASE_URL, brakiKonfiguracji } from '../src/config.js';
+import { KATALOG_KOPII, SUPABASE_URL, wymagajKonfiguracji } from '../src/config.js';
 import { wybierz } from '../src/supabase.js';
 
 /** Kolejnosc ma znaczenie przy odtwarzaniu - rodzice przed dziecmi. */
@@ -38,11 +38,7 @@ async function pobierzCalaTabele(tabela) {
 }
 
 async function main() {
-  const braki = brakiKonfiguracji().filter((b) => b !== 'HASLO_PANELU');
-  if (braki.length) {
-    console.error(`Brakuje w backend/.env: ${braki.join(', ')}`);
-    process.exit(1);
-  }
+  wymagajKonfiguracji();
 
   fs.mkdirSync(KATALOG_KOPII, { recursive: true });
 

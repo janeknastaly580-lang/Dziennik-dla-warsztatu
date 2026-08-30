@@ -34,6 +34,9 @@ type Kontekst = {
   faza: Faza;
   mechanik: string | null;
   warsztat: string | null;
+  /** 'administrator' odblokowuje ekran zarzadzania dostepem. Nic wiecej. */
+  rola: string;
+  czyAdministrator: boolean;
   sync: StanSynchronizacji;
   /** Po udanym parowaniu / ustawieniu hasla / odblokowaniu. */
   odswiezFaze: () => Promise<void>;
@@ -52,6 +55,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
   const [faza, setFaza] = useState<Faza>('ladowanie');
   const [mechanik, setMechanik] = useState<string | null>(null);
   const [warsztat, setWarsztat] = useState<string | null>(null);
+  const [rola, setRola] = useState<string>('mechanik');
   const [sync, setSync] = useState<StanSynchronizacji>(stanSynchronizacji());
 
   const odblokowanaDo = useRef<number>(0);
@@ -67,9 +71,10 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
       setFaza('parowanie');
       return;
     }
-    const { mechanik: imie, warsztat: nazwa } = await daneMechanika();
+    const { mechanik: imie, warsztat: nazwa, rola: obecnaRola } = await daneMechanika();
     setMechanik(imie);
     setWarsztat(nazwa);
+    setRola(obecnaRola);
 
     if (!(await czyHasloUstawione())) {
       setFaza('ustaw_haslo');
@@ -93,6 +98,13 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
 
   /* --------------------------- stan synchronizacji ---------------------- */
   useEffect(() => obserwujSynchronizacje(setSync), []);
+
+  // Rola moze sie zmienic po stronie serwera (administrator kogos awansowal
+  // albo odebral uprawnienia) - odczytujemy ja po kazdej synchronizacji.
+  useEffect(() => {
+    if (sync.trwa) return;
+    daneMechanika().then(({ rola: swieza }) => setRola(swieza));
+  }, [sync.trwa, sync.ostatniaUdana]);
 
   /* --------------------------- A5: bezczynnosc -------------------------- */
 
@@ -165,14 +177,17 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
     odblokowanaDo.current = 0;
     setMechanik(null);
     setWarsztat(null);
+    setRola('mechanik');
     setFaza('parowanie');
   }, []);
 
   const wartosc = useMemo<Kontekst>(() => ({
     faza, mechanik, warsztat, sync,
+    rola, czyAdministrator: rola === 'administrator',
     odswiezFaze, odblokowano, zablokuj, aktywnosc, wyloguj,
     potwierdzOdciecie, potwierdzResetHasla, synchronizuj,
-  }), [faza, mechanik, warsztat, sync, odswiezFaze, odblokowano, zablokuj, aktywnosc, wyloguj]);
+  }), [faza, mechanik, warsztat, sync, rola,
+       odswiezFaze, odblokowano, zablokuj, aktywnosc, wyloguj]);
 
   return (
     <KontekstAplikacji.Provider value={wartosc}>{children}</KontekstAplikacji.Provider>

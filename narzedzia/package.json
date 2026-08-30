@@ -1,23 +1,18 @@
 {
-  "name": "warsztat-panel-administratora",
+  "name": "warsztat-narzedzia",
   "version": "2.0.0",
   "private": true,
-  "description": "Panel administratora systemu warsztatu: dostep mechanikow, kwarantanna, kopie zapasowe",
+  "description": "Narzedzia dostawcy uslugi: zaproszenia, kopie zapasowe, skan sekretow. Nie jest to serwer - nic tu nie dziala w tle.",
   "type": "module",
-  "main": "src/server.js",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "zaproszenie": "node scripts/zaproszenie.js",
     "kopia": "node scripts/kopia-zapasowa.js",
     "przywroc": "node scripts/przywroc-kopie.js",
     "skanuj": "node scripts/skanuj-sekrety.js",
     "migruj": "node scripts/migruj-do-supabase.js"
-  },
-  "dependencies": {
-    "express": "^4.21.2"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.2.0"

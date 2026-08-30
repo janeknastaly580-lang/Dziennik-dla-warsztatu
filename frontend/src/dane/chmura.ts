@@ -36,7 +36,7 @@ export class BladDostepu extends Error {
 const LIMIT_CZASU_MS = 25_000;
 
 async function wywolaj(
-  funkcja: 'parowanie' | 'sync',
+  funkcja: 'parowanie' | 'sync' | 'admin',
   cialo: Record<string, unknown>,
   token?: string | null,
 ): Promise<any> {
@@ -106,18 +106,31 @@ export function zglosUrzadzenie(dane: { platforma: string; nazwa_urzadzenia: str
   return wywolaj('parowanie', { akcja: 'zglos', ...dane }) as Promise<OdpowiedzZgloszenia>;
 }
 
+export type Rola = 'mechanik' | 'kierownik' | 'administrator';
+
 export type OdpowiedzSprawdzenia =
   | { status: 'oczekuje' | 'wygasl' }
   | {
       status: 'przyznany';
       token: string;
       urzadzenie_id: string;
-      mechanik: { id: string; imie: string };
+      mechanik: { id: string; imie: string; rola: Rola };
       warsztat: {
         id: string; nazwa: string; prefiks: string;
         okno_dni: number; wygasniecie_offline_dni: number;
       };
     };
+
+/**
+ * Druga droga wejscia: kod zaproszenia od dostawcy uslugi. Zaklada warsztat
+ * i jego pierwszego administratora. Bez tego nikt nie mialby jak zaczac -
+ * dostawca nie hostuje zadnego panelu, wiec kod jest jedynym punktem startu.
+ */
+export function aktywujZaproszenie(id: string, sekret: string, kodZaproszenia: string) {
+  return wywolaj('parowanie', {
+    akcja: 'aktywuj_zaproszenie', id, sekret, kod_zaproszenia: kodZaproszenia,
+  }) as Promise<{ ok: boolean; blad?: string }>;
+}
 
 export function sprawdzZgode(id: string, sekret: string) {
   return wywolaj('parowanie', { akcja: 'sprawdz', id, sekret }) as Promise<OdpowiedzSprawdzenia>;
@@ -141,7 +154,7 @@ export type OdpowiedzPull = {
   kursory?: { klienci: Kursor; wizyty: Kursor };
   wiecej?: boolean;
   wymaga_aktualizacji?: boolean;
-  mechanik: { id: string; imie: string };
+  mechanik: { id: string; imie: string; rola: Rola };
   warsztat: { id: string; nazwa: string; prefiks: string; okno_dni: number };
   polecenia: { reset_hasla: boolean };
   wygasniecie_offline_dni: number;
@@ -181,4 +194,89 @@ export function wyslijZmiany(token: string, zmiany: ZmianaDoWyslania[]) {
 
 export function sprawdzStan(token: string) {
   return wywolaj('sync', { akcja: 'stan' }, token) as Promise<OdpowiedzPull>;
+}
+
+/* ====================================================================== */
+/*  ADMINISTRATOR                                                         */
+/*                                                                        */
+/*  Administrator to mechanik z rola "administrator" - nie ma zadnego     */
+/*  osobnego panelu ani serwera. Moze dokladnie dwie rzeczy wiecej:       */
+/*  przyznac dostep telefonowi i odebrac dostep. Uprawnienia sprawdza     */
+/*  funkcja brzegowa ORAZ, niezaleznie od niej, kazda funkcja w bazie.    */
+/* ====================================================================== */
+
+export type UrzadzenieAdmina = {
+  id: string;
+  nazwa: string | null;
+  platforma: string | null;
+  wersja: string | null;
+  ostatnia_sync_o: string | null;
+  zablokowane_o: string | null;
+  czeka_na_haslo: boolean;
+};
+
+export type MechanikAdmina = {
+  id: string;
+  imie: string;
+  rola: Rola;
+  zablokowany_o: string | null;
+  powod_blokady: string | null;
+  to_ja: boolean;
+  urzadzenia: UrzadzenieAdmina[];
+};
+
+export type OczekujaceUrzadzenie = {
+  kod: string;
+  nazwa: string | null;
+  platforma: string | null;
+  wersja: string | null;
+  zgloszone_o: string;
+  wygasa_o: string;
+};
+
+export type DaneAdmina = {
+  ok: boolean;
+  warsztat: { id: string; nazwa: string; prefiks: string };
+  mechanicy: MechanikAdmina[];
+  oczekujace: OczekujaceUrzadzenie[];
+};
+
+/** Wynik akcji administratora. `ok:false` to odmowa merytoryczna, nie awaria. */
+export type WynikAkcji = { ok: boolean; blad?: string };
+
+export function daneAdmina(token: string) {
+  return wywolaj('admin', { akcja: 'dane' }, token) as Promise<DaneAdmina>;
+}
+
+export function dodajMechanika(token: string, imie: string, rola: Rola = 'mechanik') {
+  return wywolaj('admin', { akcja: 'dodaj_mechanika', imie, rola }, token) as Promise<WynikAkcji>;
+}
+
+/** Przyznanie dostepu: kod z ekranu telefonu + wybrany mechanik. Bez hasla. */
+export function przyznajDostep(token: string, kod: string, mechanikId: string) {
+  return wywolaj('admin', {
+    akcja: 'przyznaj', kod, mechanik_id: mechanikId,
+  }, token) as Promise<WynikAkcji>;
+}
+
+export function zablokujMechanika(token: string, mechanikId: string, powod?: string) {
+  return wywolaj('admin', {
+    akcja: 'zablokuj_mechanika', mechanik_id: mechanikId, powod,
+  }, token) as Promise<WynikAkcji>;
+}
+
+export function odblokujMechanika(token: string, mechanikId: string) {
+  return wywolaj('admin', {
+    akcja: 'odblokuj_mechanika', mechanik_id: mechanikId,
+  }, token) as Promise<WynikAkcji>;
+}
+
+export function akcjaNaUrzadzeniu(
+  token: string,
+  urzadzenieId: string,
+  co: 'zablokuj' | 'odblokuj' | 'wyrejestruj' | 'reset_hasla',
+) {
+  return wywolaj('admin', {
+    akcja: 'urzadzenie', urzadzenie_id: urzadzenieId, co,
+  }, token) as Promise<WynikAkcji>;
 }

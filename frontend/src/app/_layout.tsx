@@ -52,6 +52,9 @@ function Bramka() {
         <Stack.Screen name="klient/[id]" options={{ title: 'Profil klienta' }} />
         <Stack.Screen name="wizyta/[id]" options={{ title: 'Wizyta' }} />
         <Stack.Screen name="usterki" options={{ title: 'Otwarte usterki' }} />
+        {/* Ekran otwiera sie tylko z przycisku widocznego dla administratora,
+            a i tak sam sprawdza uprawnienia - podobnie jak serwer. */}
+        <Stack.Screen name="administracja" options={{ title: 'Dostep' }} />
         <Stack.Screen
           name="klient/nowy"
           options={{ title: 'Nowy klient', presentation: 'modal' }}

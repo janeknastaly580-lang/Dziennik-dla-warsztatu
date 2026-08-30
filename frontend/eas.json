@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "//": [
+      "preview    - plik .apk do zainstalowania wprost na telefonach warsztatu",
+      "production - .aab do Google Play",
+      "Oba profile buduja sie w chmurze EAS. Na Twoim komputerze nie zostaje",
+      "nic, co musialoby dzialac - to tylko polecenie, ktore zleca build."
+    ],
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

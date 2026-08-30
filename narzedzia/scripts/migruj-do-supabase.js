@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import { KATALOG_PROJEKTU, SUPABASE_URL, SERVICE_ROLE_KEY, brakiKonfiguracji } from '../src/config.js';
+import { KATALOG_PROJEKTU, SUPABASE_URL, SERVICE_ROLE_KEY, wymagajKonfiguracji } from '../src/config.js';
 import { wybierz } from '../src/supabase.js';
 
 const SCIEZKA_STAREJ_BAZY = path.join(KATALOG_PROJEKTU, 'dane', 'warsztat.db');
@@ -52,11 +52,7 @@ async function main() {
   const iPrefiks = process.argv.indexOf('--warsztat');
   const prefiks = iPrefiks > -1 ? process.argv[iPrefiks + 1] : 'W1';
 
-  const braki = brakiKonfiguracji().filter((b) => b !== 'HASLO_PANELU');
-  if (braki.length) {
-    console.error(`Brakuje w backend/.env: ${braki.join(', ')}`);
-    process.exit(1);
-  }
+  wymagajKonfiguracji();
   if (!fs.existsSync(SCIEZKA_STAREJ_BAZY)) {
     console.log(`Nie ma starej bazy (${SCIEZKA_STAREJ_BAZY}) - nie ma czego przenosic.`);
     return;
@@ -66,7 +62,7 @@ async function main() {
   try {
     ({ default: Database } = await import('better-sqlite3'));
   } catch {
-    console.error('Brakuje paczki better-sqlite3. Uruchom: cd backend && npm install');
+    console.error('Brakuje paczki better-sqlite3. Uruchom: cd narzedzia && npm install');
     process.exit(1);
   }
 

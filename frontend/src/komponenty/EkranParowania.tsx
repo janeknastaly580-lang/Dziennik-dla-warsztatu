@@ -20,8 +20,8 @@ import {
 } from 'react-native';
 import * as Device from 'expo-device';
 
-import { Przycisk } from './Formularz';
-import { sprawdzZgode, zglosUrzadzenie, BladSieci } from '../dane/chmura';
+import { Pole, Przycisk } from './Formularz';
+import { aktywujZaproszenie, sprawdzZgode, zglosUrzadzenie, BladSieci } from '../dane/chmura';
 import {
   pobierzZgloszenie, zapiszDostep, zapiszZgloszenie, ZgloszenieParowania,
 } from '../dane/sesja';
@@ -40,6 +40,8 @@ export default function EkranParowania() {
   const [zajety, setZajety] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
   const [odpytywanie, setOdpytywanie] = useState(false);
+  const [kodZaproszenia, setKodZaproszenia] = useState('');
+  const [pokazZaproszenie, setPokazZaproszenie] = useState(false);
   const zywy = useRef(true);
 
   useEffect(() => () => { zywy.current = false; }, []);
@@ -67,6 +69,43 @@ export default function EkranParowania() {
       if (zywy.current) setZajety(false);
     }
   }, []);
+
+  /* ------------------------ kod zaproszenia ----------------------------- */
+  /* Pierwszy telefon w warsztacie nie ma kogo poprosic o zgode - dostaje
+     kod zaproszenia od dostawcy uslugi. Zaklada nim warsztat i wlasne konto
+     administratora, a potem sam zatwierdza pozostalych mechanikow. */
+  const uzyjZaproszenia = useCallback(async () => {
+    let biezace = zgloszenie;
+    setZajety(true);
+    setBlad(null);
+    try {
+      if (!biezace) {
+        const nazwa = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ')
+          || `telefon ${Platform.OS}`;
+        biezace = await zglosUrzadzenie({ platforma: Platform.OS, nazwa_urzadzenia: nazwa });
+        await zapiszZgloszenie(biezace);
+        if (zywy.current) setZgloszenie(biezace);
+      }
+
+      const wynik = await aktywujZaproszenie(
+        biezace.id, biezace.sekret, kodZaproszenia.trim().toUpperCase(),
+      );
+      if (!wynik.ok) {
+        setBlad(wynik.blad ?? 'Nie udalo sie uzyc tego kodu.');
+        return;
+      }
+      // Dostep jest juz przyznany - petla odpytywania odbierze token
+      // przy najblizszym przebiegu, tak samo jak przy zgodzie administratora.
+      setKodZaproszenia('');
+      setPokazZaproszenie(false);
+    } catch (err) {
+      setBlad(err instanceof BladSieci
+        ? 'Brak polaczenia z internetem. Aktywacja kodu wymaga sieci.'
+        : 'Nie udalo sie uzyc tego kodu. Sprobuj ponownie.');
+    } finally {
+      if (zywy.current) setZajety(false);
+    }
+  }, [zgloszenie, kodZaproszenia]);
 
   /* -------------------- odpytywanie o zgode administratora -------------- */
   useEffect(() => {
@@ -185,6 +224,43 @@ export default function EkranParowania() {
 
         {blad ? <Text style={style.blad}>{blad}</Text> : null}
       </View>
+
+      {/* Druga droga wejscia: pierwszy telefon w warsztacie. Nie ma jeszcze
+          administratora, ktory by go zatwierdzil, wiec zaklada warsztat
+          kodem zaproszenia otrzymanym od dostawcy uslugi. */}
+      <View style={style.karta}>
+        {pokazZaproszenie ? (
+          <>
+            <Text style={style.tytulMniejszy}>Kod zaproszenia</Text>
+            <Text style={[style.tresc, style.drobne]}>
+              Uruchamiasz warsztat po raz pierwszy? Wpisz kod otrzymany przy
+              zakupie usugi - zalozy on warsztat i Twoje konto administratora.
+            </Text>
+            <Pole
+              etykieta="Kod"
+              value={kodZaproszenia}
+              onChangeText={(t) => setKodZaproszenia(t.toUpperCase())}
+              placeholder="XXXX-XXXX-XXXX"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={24}
+            />
+            <Przycisk tytul="Uzyj kodu" onPress={uzyjZaproszenia} zajety={zajety} />
+            <Przycisk
+              tytul="Wroc"
+              wariant="drugi"
+              onPress={() => { setPokazZaproszenie(false); setBlad(null); }}
+            />
+          </>
+        ) : (
+          <Pressable onPress={() => setPokazZaproszenie(true)} hitSlop={8}>
+            <Text style={style.link}>Mam kod zaproszenia</Text>
+            <Text style={[style.tresc, style.drobne, style.bezMarginesu]}>
+              Dla pierwszej osoby w warsztacie, ktora zaklada konto administratora.
+            </Text>
+          </Pressable>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -208,6 +284,8 @@ const style = StyleSheet.create({
   },
   kartaOdciecia: { backgroundColor: Kolory.pilneTlo, borderColor: Kolory.pilneObramowanie },
   tytul: { fontSize: s(21), fontWeight: '800', color: Kolory.tekst, marginBottom: Odstepy.s },
+  tytulMniejszy: { fontSize: s(16), fontWeight: '800', color: Kolory.tekst, marginBottom: Odstepy.s },
+  bezMarginesu: { marginBottom: 0 },
   tytulOdciecia: { fontSize: s(19), fontWeight: '800', color: Kolory.pilne, marginBottom: Odstepy.s },
   tresc: { fontSize: s(14.5), lineHeight: s(21), color: Kolory.tekstDrugi, marginBottom: Odstepy.m },
   drobne: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.tekstSlaby },

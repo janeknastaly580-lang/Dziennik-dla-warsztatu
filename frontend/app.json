@@ -8,7 +8,6 @@
     "scheme": "warsztat",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-
     "//extra": [
       "A2: w aplikacji moze byc WYLACZNIE klucz publiczny (anon).",
       "Klucz service_role omija RLS - jego miejsce jest w Edge Functions",
@@ -18,7 +17,6 @@
       "supabaseUrl": "https://tpigqlvwjatlkhfqtlkt.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwaWdxbHZ3amF0bGtoZnF0bGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwMjE0MTMsImV4cCI6MjEwMzU5NzQxM30.EzdtM7UGsdyIlKuAX7JMY12jrxGuVWy6OOmRajn1MxY"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pl.warsztat.app",
@@ -26,7 +24,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "package": "pl.warsztat.app",
       "adaptiveIcon": {
@@ -44,16 +41,20 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
-
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-
     "plugins": [
       "expo-router",
-      "expo-secure-store",
-      "expo-sqlite",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       [
         "expo-local-authentication",
         {
@@ -70,10 +71,10 @@
       ],
       "./plugins/prywatnosc.js"
     ],
-
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
-    }
+    },
+    "//web": "Aplikacja nie ma wersji webowej. W przegladarce nie istnieje Keychain/Keystore (expo-secure-store), wiec token urzadzenia i haslo nie mialyby gdzie bezpiecznie lezec, a expo-sqlite wymaga tam osobnego modulu WASM. Cel to APK/IPA."
   }
 }

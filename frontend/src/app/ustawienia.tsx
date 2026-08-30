@@ -34,7 +34,9 @@ function czasLokalny(iso: string | null): string {
 
 export default function EkranUstawien() {
   const router = useRouter();
-  const { sync, mechanik, warsztat, synchronizuj, wyloguj, zablokuj } = useAplikacja();
+  const {
+    sync, mechanik, warsztat, rola, czyAdministrator, synchronizuj, wyloguj, zablokuj,
+  } = useAplikacja();
 
   const [urzadzenie, setUrzadzenie] = useState<string | null>(null);
   const [okno, setOkno] = useState<string | null>(null);
@@ -92,6 +94,10 @@ export default function EkranUstawien() {
       <Sekcja tytul="TO URZADZENIE">
         <Wiersz etykieta="Mechanik" wartosc={mechanik ?? '-'} />
         <Wiersz etykieta="Warsztat" wartosc={warsztat ?? '-'} />
+        <Wiersz
+          etykieta="Uprawnienia"
+          wartosc={czyAdministrator ? 'administrator warsztatu' : rola}
+        />
         <Wiersz etykieta="Wersja aplikacji" wartosc={WERSJA_APLIKACJI} />
         <Wiersz etykieta="Wersja danych" wartosc={String(WERSJA_SCHEMATU)} />
         <Wiersz etykieta="Historia na telefonie" wartosc={`${okno ?? '90'} dni + wszystko otwarte`} />
@@ -103,6 +109,21 @@ export default function EkranUstawien() {
           Podaj numer urzadzenia administratorowi, jesli prosi o identyfikacje telefonu.
         </Text>
       </Sekcja>
+
+      {czyAdministrator ? (
+        <Sekcja tytul="ZARZADZANIE DOSTEPEM">
+          <Text style={style.podpowiedz}>
+            Jako administrator warsztatu mozesz przyznac dostep telefonowi
+            mechanika - zdalnie, jednorazowym kodem z jego ekranu, bez podawania
+            zadnego hasla - oraz odebrac dostep, gdy ktos odchodzi albo zgubi
+            telefon. Poza tym widzisz dokladnie to samo co kazdy mechanik.
+          </Text>
+          <Przycisk
+            tytul="Otworz zarzadzanie dostepem"
+            onPress={() => router.push('/administracja')}
+          />
+        </Sekcja>
+      ) : null}
 
       <Sekcja tytul="BEZPIECZENSTWO">
         <View style={style.informacja}>

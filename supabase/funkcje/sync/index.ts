@@ -130,7 +130,14 @@ Deno.serve(async (req: Request) => {
       serwer_czas: new Date().toISOString(),
       wersja_schematu: WERSJA_SCHEMATU,
       wymaga_aktualizacji: wymagaAktualizacji,
-      mechanik: { id: sesja.mechanik_id, imie: sesja.mechanik_imie },
+      mechanik: {
+        id: sesja.mechanik_id,
+        imie: sesja.mechanik_imie,
+        // Rola decyduje, czy telefon pokaze ekran zarzadzania dostepem.
+        // Przychodzi przy kazdej synchronizacji, wiec odebranie uprawnien
+        // administratora dziala natychmiast.
+        rola: sesja.rola ?? "mechanik",
+      },
       warsztat: {
         id: sesja.warsztat_id,
         nazwa: sesja.warsztat_nazwa,

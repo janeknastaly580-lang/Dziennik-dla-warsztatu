@@ -12,15 +12,59 @@
  * D5 - kolumna `oczekuje` mowi, czy rekord czeka jeszcze na wyslanie.
  *      Z tego biora sie zegarek i ptaszek przy kafelkach.
  *
- * A12 - plik bazy lezy w podkatalogu `warsztat`, ktory wtyczka
- *       `plugins/prywatnosc.js` wyklucza z kopii zapasowej iCloud
- *       i Google Drive. Sprawdz to po zbudowaniu aplikacji, nie zakladaj.
+ * A4  - Plik bazy jest SZYFROWANY (SQLCipher). Klucz nie ma go w kodzie:
+ *       powstaje losowo przy pierwszym uruchomieniu i lezy w Keychain /
+ *       Keystore z flaga "tylko to urzadzenie". Wyjecie karty pamieci albo
+ *       skopiowanie pliku bazy z zgubionego telefonu daje szyfrogram.
+ *       Wymaga wlasnego builda (app.json -> expo-sqlite: useSQLCipher).
+ *
+ * A12 - Wtyczka `plugins/prywatnosc.js` wyklucza dane aplikacji z kopii
+ *       zapasowej iCloud i Google Drive. Sprawdz to po zbudowaniu, nie zakladaj.
  */
+import * as Crypto from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 
 export const NAZWA_BAZY = 'warsztat.db';
 
+const K_KLUCZ_BAZY = 'warsztat_klucz_bazy';
+
+/** Klucz zostaje na tym urzadzeniu - nie wedruje z kopia zapasowa. */
+const OPCJE_KLUCZA: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 let polaczenie: SQLite.SQLiteDatabase | null = null;
+
+/**
+ * 256-bitowy klucz szyfrowania lokalnej bazy. Przy pierwszym uruchomieniu
+ * losowany i zapisywany w bezpiecznym magazynie systemu; potem tylko czytany.
+ */
+async function kluczBazy(): Promise<string> {
+  const istniejacy = await SecureStore.getItemAsync(K_KLUCZ_BAZY, OPCJE_KLUCZA).catch(() => null);
+  if (istniejacy && /^[0-9a-f]{64}$/.test(istniejacy)) return istniejacy;
+
+  const nowy = Array.from(Crypto.getRandomBytes(32))
+    .map((b) => b.toString(16).padStart(2, '0')).join('');
+  await SecureStore.setItemAsync(K_KLUCZ_BAZY, nowy, OPCJE_KLUCZA);
+  return nowy;
+}
+
+/**
+ * Usuwa klucz - po tym stary plik bazy jest juz nie do odczytania.
+ * Zamykamy tez polaczenie, zeby nastepne otwarcie zalozylo swiezy,
+ * zaszyfrowany nowym kluczem plik zamiast pisac do starego.
+ */
+export async function skasujKluczBazy(): Promise<void> {
+  await SecureStore.deleteItemAsync(K_KLUCZ_BAZY, OPCJE_KLUCZA).catch(() => undefined);
+  try {
+    await polaczenie?.closeAsync();
+  } catch {
+    // Zamkniecie i tak nie moze zablokowac wylogowania.
+  }
+  polaczenie = null;
+  await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
+}
 
 /** Kolejne wersje schematu lokalnego. Zmiany WYLACZNIE addytywne (B10). */
 const MIGRACJE: string[] = [
@@ -87,11 +131,40 @@ const MIGRACJE: string[] = [
   `,
 ];
 
+/**
+ * Otwiera zaszyfrowana baze i doprowadza schemat do biezacej wersji.
+ *
+ * `PRAGMA key` musi byc PIERWSZA instrukcja po otwarciu pliku - dopiero po
+ * niej SQLCipher potrafi cokolwiek odczytac. Klucz podajemy w postaci surowej
+ * (x'...'), wiec SQLCipher nie przepuszcza go przez wolne wyprowadzanie klucza
+ * i nie ma tu miejsca na wstrzykniecie - to 64 znaki szesnastkowe.
+ */
+async function otworzZaszyfrowana(): Promise<SQLite.SQLiteDatabase> {
+  const klucz = await kluczBazy();
+  const db = await SQLite.openDatabaseAsync(NAZWA_BAZY);
+  await db.execAsync(`PRAGMA key = "x'${klucz}'"`);
+  // Odczyt czegokolwiek udaje sie tylko przy poprawnym kluczu - to jest
+  // sprawdzenie, czy plik faktycznie da sie odszyfrowac.
+  await db.getFirstAsync('SELECT count(*) AS n FROM sqlite_master');
+  return db;
+}
+
 /** Otwiera baze i doprowadza schemat do biezacej wersji. */
 export async function otworzBaze(): Promise<SQLite.SQLiteDatabase> {
   if (polaczenie) return polaczenie;
 
-  const db = await SQLite.openDatabaseAsync(NAZWA_BAZY);
+  let db: SQLite.SQLiteDatabase;
+  try {
+    db = await otworzZaszyfrowana();
+  } catch {
+    // Plik jest nie do odczytania tym kluczem: zostal po starszej, nieszyfrowanej
+    // wersji aplikacji albo klucz zniknal z Keychain. Lokalna baza jest kopia
+    // robocza danych z serwera, wiec zakladamy ja od nowa i synchronizujemy.
+    // Niewyslane zmiany z takiej bazy i tak bylyby nieczytelne.
+    await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
+    db = await otworzZaszyfrowana();
+  }
+
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF;');
 
   const wiersz = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');

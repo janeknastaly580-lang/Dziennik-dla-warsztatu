@@ -29,7 +29,7 @@ import type { KlientNaLiscie } from '../typy';
 
 export default function EkranListyKlientow() {
   const router = useRouter();
-  const { synchronizuj } = useAplikacja();
+  const { synchronizuj, czyAdministrator } = useAplikacja();
 
   const [klienci, setKlienci] = useState<KlientNaLiscie[]>([]);
   const [fraza, setFraza] = useState('');
@@ -79,14 +79,28 @@ export default function EkranListyKlientow() {
       options={{
         title: 'Klienci',
         headerLeft: () => (
-          <Pressable
-            onPress={() => router.push('/ustawienia')}
-            hitSlop={10}
-            accessibilityLabel="Aplikacja i synchronizacja"
-            style={style.przyciskUstawien}
-          >
-            <Text style={style.ikonaUstawien}>{'⚙'}</Text>
-          </Pressable>
+          <View style={style.lewaStrona}>
+            <Pressable
+              onPress={() => router.push('/ustawienia')}
+              hitSlop={10}
+              accessibilityLabel="Aplikacja i synchronizacja"
+              style={style.przyciskUstawien}
+            >
+              <Text style={style.ikonaUstawien}>{'⚙'}</Text>
+            </Pressable>
+            {/* Jedyna roznica w interfejsie miedzy administratorem
+                a mechanikiem: ten jeden przycisk. */}
+            {czyAdministrator ? (
+              <Pressable
+                onPress={() => router.push('/administracja')}
+                hitSlop={10}
+                accessibilityLabel="Zarzadzanie dostepem mechanikow"
+                style={style.przyciskUstawien}
+              >
+                <Text style={style.ikonaUstawien}>{'⚿'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ),
         headerRight: () => (
           <Pressable
@@ -220,6 +234,7 @@ const style = StyleSheet.create({
   },
   przyciskDodajWcisniety: { backgroundColor: Kolory.akcentCiemny },
   przyciskDodajTekst: { color: Kolory.tekstNaAkcencie, fontSize: s(14), fontWeight: '800' },
+  lewaStrona: { flexDirection: 'row', alignItems: 'center' },
   przyciskUstawien: { paddingHorizontal: Odstepy.xs },
   ikonaUstawien: { fontSize: s(20), color: Kolory.tekstDrugi },
 });

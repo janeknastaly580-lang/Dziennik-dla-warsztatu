@@ -22,7 +22,7 @@ $Anon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6In
 $Tabele = @(
   'klienci', 'wizyty', 'mechanicy', 'urzadzenia', 'warsztaty',
   'kwarantanna', 'mozliwe_duplikaty', 'dziennik_dostepu', 'dziennik_admina',
-  'operacje', 'numeratory', 'limity'
+  'operacje', 'numeratory', 'limity', 'zaproszenia'
 )
 
 $Naglowki = @{ apikey = $Anon; Authorization = "Bearer $Anon" }
@@ -54,7 +54,10 @@ foreach ($t in $Tabele) {
 Write-Host ('-' * 70)
 
 # Sprawdzenie, czy funkcje SQL nie sa wystawione dla anona
-$FunkcjeDoSprawdzenia = @('stan_systemu', 'zadanie_retencji', 'przyznaj_dostep', 'zapisz_z_telefonu')
+$FunkcjeDoSprawdzenia = @('stan_systemu', 'zadanie_retencji', 'zapisz_z_telefonu',
+                          'utworz_zaproszenie', 'aktywuj_zaproszenie',
+                          'dane_administracyjne', 'admin_przyznaj_dostep',
+                          'admin_zablokuj_mechanika')
 foreach ($f in $FunkcjeDoSprawdzenia) {
   try {
     Invoke-WebRequest -Uri "$Url/rest/v1/rpc/$f" -Headers $Naglowki -Method POST `

@@ -1,12 +1,16 @@
 /**
- * Edge Function `parowanie` - przyznawanie dostepu do aplikacji mobilnej.
+ * Edge Function `parowanie` - dwie drogi wejscia do aplikacji.
  *
- * WYMAGANIE: mechanik nie zna zadnego hasla do systemu. Dostep przyznaje mu
- * administrator ZDALNIE, jednorazowo, a mechanik ustawia potem na telefonie
- * dowolne wlasne haslo (blokada aplikacji). Administrator moze tez dostep
- * odebrac - wtedy telefon przestaje dzialac i czysci lokalna baze.
+ *  A. KOD ZAPROSZENIA (od dostawcy uslugi) - zaklada warsztat i jego
+ *     pierwszego administratora. Bez tego nikt nie ma jak zaczac.
+ *  B. KOD PAROWANIA (z ekranu telefonu) - administrator warsztatu zatwierdza
+ *     go w aplikacji, zdalnie, jednorazowo, bez zadnego hasla.
  *
- * Przebieg:
+ * WYMAGANIE: mechanik nie zna zadnego hasla do systemu. Mechanik ustawia
+ * potem na telefonie dowolne wlasne haslo (blokada aplikacji). Administrator
+ * moze tez dostep odebrac - wtedy telefon czysci lokalna baze.
+ *
+ * Przebieg drogi B:
  *   1. telefon:  { akcja: "zglos" }
  *                -> dostaje KOD (8 znakow, pokazuje go na ekranie)
  *                   i SEKRET (256 bitow, trzyma u siebie)
@@ -96,6 +100,19 @@ async function limitPrzekroczony(klucz: string, maks: number, oknoMinut: number)
   return false;
 }
 
+/** Sprawdza, czy zadanie pochodzi z tego telefonu, ktory zaczal parowanie. */
+async function zgloszenieZSekretem(id: string, sekret: string) {
+  const { data } = await db
+    .from("urzadzenia")
+    .select("id, sekret_hash, kod_wygasa_o, przyznany_o, mechanik_id, warsztat_id, " +
+            "zablokowane_o, powod_blokady, token_hash")
+    .eq("id", id)
+    .maybeSingle();
+  // Ta sama odpowiedz dla nieznanego id i zlego sekretu - brak wyciekow.
+  if (!data || data.sekret_hash !== (await sha256(sekret))) return null;
+  return data;
+}
+
 /* ===================================================================== */
 
 Deno.serve(async (req: Request) => {
@@ -151,23 +168,41 @@ Deno.serve(async (req: Request) => {
       return odpowiedz(503, { kod: "NIE_UDALO_SIE_WYGENEROWAC_KODU" });
     }
 
-    /* ------------------- 2. ODPYTANIE O ZGODE ------------------------ */
+    /* ------------ 2. KOD ZAPROSZENIA: NOWY WARSZTAT ------------------ */
+    /* Pierwszy telefon w warsztacie nie ma kogo poprosic o zgode. Kod
+       zaproszenia zaklada warsztat i konto administratora, a token odbiera
+       potem ta sama sciezka co przy zgodzie administratora. */
+    if (akcja === "aktywuj_zaproszenie") {
+      const id = tekst(cialo.id, 64);
+      const sekret = tekst(cialo.sekret, 128);
+      const kodZaproszenia = tekst(cialo.kod_zaproszenia, 24)?.toUpperCase();
+      if (!id || !sekret || !kodZaproszenia) return odpowiedz(400, { kod: "BRAK_DANYCH" });
+
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "nieznane";
+      if (await limitPrzekroczony(`zapro:${ip}`, 30, 60)) {
+        return odpowiedz(429, { kod: "ZA_DUZO_PROB" });
+      }
+
+      const u = await zgloszenieZSekretem(id, sekret);
+      if (!u) return odpowiedz(404, { kod: "NIEZNANE_ZGLOSZENIE" });
+
+      const { data, error } = await db.rpc("aktywuj_zaproszenie", {
+        p_urzadzenie: id, p_kod: kodZaproszenia,
+      });
+      if (error) throw error;
+
+      log("aktywacja_zaproszenia", { ok: !!data?.ok });
+      return odpowiedz(200, data);
+    }
+
+    /* ------------------- 3. ODPYTANIE O ZGODE ------------------------ */
     if (akcja === "sprawdz") {
       const id = tekst(cialo.id, 64);
       const sekret = tekst(cialo.sekret, 128);
       if (!id || !sekret) return odpowiedz(400, { kod: "BRAK_DANYCH" });
 
-      const { data: u } = await db
-        .from("urzadzenia")
-        .select("id, sekret_hash, kod_wygasa_o, przyznany_o, mechanik_id, warsztat_id, " +
-                "zablokowane_o, powod_blokady, token_hash")
-        .eq("id", id)
-        .maybeSingle();
-
-      // Ta sama odpowiedz dla nieznanego id i zlego sekretu - brak wyciekow.
-      if (!u || u.sekret_hash !== (await sha256(sekret))) {
-        return odpowiedz(404, { kod: "NIEZNANE_ZGLOSZENIE" });
-      }
+      const u = await zgloszenieZSekretem(id, sekret);
+      if (!u) return odpowiedz(404, { kod: "NIEZNANE_ZGLOSZENIE" });
       if (u.zablokowane_o) {
         return odpowiedz(403, { kod: "ZABLOKOWANE", powod: u.powod_blokady });
       }
@@ -198,7 +233,7 @@ Deno.serve(async (req: Request) => {
       if (!po?.token_hash) return odpowiedz(409, { kod: "TOKEN_JUZ_WYDANY" });
 
       const { data: mech } = await db
-        .from("mechanicy").select("id, imie").eq("id", u.mechanik_id!).maybeSingle();
+        .from("mechanicy").select("id, imie, rola").eq("id", u.mechanik_id!).maybeSingle();
       const { data: wars } = await db
         .from("warsztaty")
         .select("id, nazwa, prefiks, okno_dni, wygasniecie_offline_dni")
@@ -215,7 +250,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    /* --------------- 3. MECHANIK USTAWIL WLASNE HASLO ---------------- */
+    /* --------------- 4. MECHANIK USTAWIL WLASNE HASLO ---------------- */
     if (akcja === "haslo_ustawione") {
       const token = req.headers.get("x-token-urzadzenia");
       if (!token) return odpowiedz(401, { kod: "BRAK_TOKENU" });

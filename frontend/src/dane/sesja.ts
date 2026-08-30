@@ -27,7 +27,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 import { MAKS_PROB_HASLA } from './konfiguracja';
-import { pobierzMeta, ustawMeta, wyczyscDaneWarsztatu } from './baza';
+import { pobierzMeta, skasujKluczBazy, ustawMeta, wyczyscDaneWarsztatu } from './baza';
 
 const K_TOKEN = 'warsztat_token';
 const K_URZADZENIE = 'warsztat_urzadzenie';
@@ -75,7 +75,7 @@ export async function pobierzZgloszenie(): Promise<ZgloszenieParowania | null> {
 export async function zapiszDostep(dane: {
   token: string;
   urzadzenie_id: string;
-  mechanik: { id: string; imie: string };
+  mechanik: { id: string; imie: string; rola?: string };
   warsztat: { id: string; nazwa: string; prefiks: string; okno_dni: number;
               wygasniecie_offline_dni: number };
 }): Promise<void> {
@@ -85,6 +85,10 @@ export async function zapiszDostep(dane: {
 
   await ustawMeta('mechanik_id', dane.mechanik.id);
   await ustawMeta('mechanik_imie', dane.mechanik.imie);
+  // Rola decyduje o tym, czy telefon pokaze ekran zarzadzania dostepem.
+  // Jest odswiezana przy kazdej synchronizacji, wiec odebranie uprawnien
+  // administratora dziala od razu.
+  await ustawMeta('rola', dane.mechanik.rola ?? 'mechanik');
   await ustawMeta('warsztat_id', dane.warsztat.id);
   await ustawMeta('warsztat_nazwa', dane.warsztat.nazwa);
   await ustawMeta('warsztat_prefiks', dane.warsztat.prefiks);
@@ -96,6 +100,7 @@ export async function daneMechanika() {
   return {
     mechanik: await pobierzMeta('mechanik_imie'),
     warsztat: await pobierzMeta('warsztat_nazwa'),
+    rola: (await pobierzMeta('rola')) ?? 'mechanik',
   };
 }
 
@@ -201,4 +206,6 @@ export async function wyczyscWszystko(): Promise<void> {
     skasuj(K_SOL), skasuj(K_WERYFIKATOR), skasuj(K_PROBY),
   ]);
   await wyczyscDaneWarsztatu();
+  // A4: bez klucza pozostalosci pliku bazy na dysku sa juz tylko szyfrogramem.
+  await skasujKluczBazy();
 }

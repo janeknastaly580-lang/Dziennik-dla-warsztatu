@@ -30,6 +30,34 @@ i [frontend/plugins/prywatnosc.js](frontend/plugins/prywatnosc.js)).
 
 ---
 
+## Druga decyzja: nic nie jest hostowane po stronie dostawcy
+
+Nie ma panelu administracyjnego na czyimkolwiek komputerze. Cały działający
+system to Supabase i telefony. Zarządzanie dostępem żyje **w tej samej
+aplikacji**, pod rolą `administrator`.
+
+Znaczenie dla bezpieczeństwa:
+
+- **Mniejsza powierzchnia ataku.** Nie ma serwera z kluczem `service_role`,
+  który mógłby przypadkiem trafić na `0.0.0.0`, zostać zapomniany po
+  aktualizacji systemu albo działać ze starą wersją zależności.
+- **Nie ma hasła do panelu**, którego dałoby się wyłudzić albo odgadnąć.
+  Uprawnienia administratora wiszą na roli w bazie i na tokenie urządzenia,
+  a token unieważnia się jednym przyciskiem.
+- **Dostawca nie ma wglądu w bieżącą pracę warsztatu.** Jego jedyny punkt
+  styku to wystawienie jednorazowego kodu zaproszenia dla nowego warsztatu.
+
+Uprawnienia administratora są sprawdzane **dwa razy, niezależnie**: w funkcji
+brzegowej `admin` (rola z tokenu) oraz w każdej funkcji SQL
+(`sprawdz_admina()`). Podmiana żądania z telefonu zwykłego mechanika nic nie
+daje — sprawdzone na żywo: `{"kod":"BRAK_UPRAWNIEN"}`.
+
+Zabezpieczenie przed zamknięciem się na zewnątrz: administrator nie może
+zablokować samego siebie, odciąć własnego telefonu ani zablokować **ostatniego
+czynnego administratora** warsztatu.
+
+---
+
 # A. Ryzyka wycieku danych
 
 ### A1 — Brak lub błędne RLS ✅
@@ -72,12 +100,12 @@ to **zamierzony** stan „deny‑by‑default”, nie usterka.
 - W aplikacji mobilnej jest **wyłącznie** klucz `anon`
   ([frontend/src/dane/konfiguracja.ts](frontend/src/dane/konfiguracja.ts)).
 - `service_role` żyje w dwóch miejscach: w sekretach Edge Functions (po stronie
-  Supabase) i w `backend/.env` na komputerze warsztatu. `.env` jest w
-  `.gitignore`.
+  Supabase) i w `narzedzia/.env` na komputerze **dostawcy usługi** — nie
+  warsztatu. `.env` jest w `.gitignore`.
 - Skaner sekretów + hook `pre-commit`:
-  [backend/scripts/skanuj-sekrety.js](backend/scripts/skanuj-sekrety.js)
+  [narzedzia/scripts/skanuj-sekrety.js](narzedzia/scripts/skanuj-sekrety.js)
   ```bash
-  cd backend && npm run skanuj -- --hook
+  cd narzedzia && npm run skanuj -- --hook
   ```
   Wykrywa JWT z rolą `service_role`, klucze `sb_secret_…`, hasła w URL-ach
   Postgresa, klucze prywatne PEM, tokeny GitHub i AWS.
@@ -98,36 +126,37 @@ Serwer: `pobierz_wizyty()` w
 [0003_funkcje_synchronizacji.sql](supabase/migracje/0003_funkcje_synchronizacji.sql).
 Telefon stosuje **tę samą regułę u siebie** — `posprzatajPozaOknem()` w
 [frontend/src/dane/repozytorium.ts](frontend/src/dane/repozytorium.ts) kasuje
-lokalnie zamknięte wizyty spoza okna. Okno zmienia się w panelu administratora
-(zakładka Ustawienia) i telefony przyjmują je przy najbliższej synchronizacji.
+lokalnie zamknięte wizyty spoza okna. Okno zmienia się w kolumnie `okno_dni`
+tabeli `warsztaty`, a telefony przyjmują nową wartość przy najbliższej
+synchronizacji.
 
 ### A4 — Zgubiony, skradziony lub sprzedany telefon ✅ ⚙️
 
-- **Auto‑wipe:** telefon, który nie połączył się z serwerem przez
+- **Szyfrowanie lokalnej bazy (SQLCipher).** Plik SQLite na telefonie jest
+  zaszyfrowany. Klucza nie ma w kodzie: 256 bitów losowanych przy pierwszym
+  uruchomieniu, zapisanych w Keychain / Keystore z flagą
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. Skopiowanie pliku bazy ze znalezionego
+  telefonu daje szyfrogram.
+  Włączane opcją `useSQLCipher` wtyczki `expo-sqlite`
+  ([frontend/app.json](frontend/app.json)); klucz i otwarcie bazy —
+  [frontend/src/dane/baza.ts](frontend/src/dane/baza.ts).
+  ⚙️ Działa **wyłącznie we własnym buildzie**, nie w Expo Go.
+- **Auto-wipe:** telefon, który nie połączył się z serwerem przez
   *wygaśnięcie offline* (domyślnie 14 dni, ustawiane per warsztat), kasuje całą
   lokalną bazę. Skradziony telefon nigdy się nie połączy, więc wyczyści się sam.
   `sprawdzWygasniecieOffline()` w
   [frontend/src/dane/synchronizacja.ts](frontend/src/dane/synchronizacja.ts);
-  sprawdzane przy starcie, przy każdym powrocie z tła i przy każdej próbie
-  synchronizacji.
-- **Zdalne unieważnienie:** panel administratora → „Zablokuj telefon” /
-  „Wyrejestruj (zgubiony)”. Telefon przy najbliższym kontakcie dostaje
-  `WYCZYSC` i kasuje dane.
-- **Czyszczenie przy wylogowaniu:** przycisk w ekranie ustawień aplikacji.
+  sprawdzane przy starcie, przy powrocie z tła i przy każdej próbie synchronizacji.
+- **Zdalne unieważnienie:** ekran „Dostęp" administratora → „Zablokuj telefon"
+  albo „Zgubiony". Telefon przy najbliższym kontakcie dostaje `WYCZYSC`
+  i kasuje dane.
+- **Czyszczenie przy wylogowaniu** — razem z kluczem szyfrowania, więc
+  pozostałości pliku na dysku są już nie do odczytania.
 - **Blokada po 10 nieudanych próbach hasła** — kasuje lokalną bazę.
-- **Klucze w Keychain / Keystore** z flagą `WHEN_UNLOCKED_THIS_DEVICE_ONLY` —
-  nie da się ich przenieść kopią zapasową na inny telefon
-  ([frontend/src/dane/sesja.ts](frontend/src/dane/sesja.ts)).
 - **Wąskie okno synchronizacji (A3)** ogranicza to, co w ogóle jest do stracenia.
 
-⚙️ **Czego świadomie nie ma:** pełnego szyfrowania pliku SQLite (SQLCipher).
-`expo-sqlite` nie ma go w standardzie — wymagałby zamiany biblioteki na
-`op-sqlite` z SQLCipher i własnego builda. Zamiast tego stoi: wymuszony PIN/
-biometria na wejściu do aplikacji, auto‑wipe, wyłączone kopie zapasowe (A12)
-i szyfrowanie całego dysku telefonu przez system (Android 10+ i iOS szyfrują
-pamięć domyślnie, o ile ustawiony jest PIN — dlatego **wymuś PIN na telefonach
-służbowych**, patrz 👤). Jeśli chcesz SQLCipher, jest to jedna, dobrze
-zdefiniowana zmiana w [frontend/src/dane/baza.ts](frontend/src/dane/baza.ts).
+👤 Systemowe szyfrowanie pamięci i ochrona Keystore działają **tylko wtedy, gdy
+telefon ma ustawiony PIN lub odcisk palca** — wymuś to na telefonach służbowych.
 
 ### A5 — Aplikacja otwarta na niezablokowanym telefonie ✅
 
@@ -143,8 +172,8 @@ Własna blokada aplikacji, niezależna od blokady systemowej:
 
 ### A6 — Były pracownik z aktywną sesją ✅
 
-Procedura offboardingu to **jeden przycisk** w panelu: „Zablokuj dostęp” przy
-mechaniku. Skutek natychmiastowy:
+Procedura offboardingu to **jeden przycisk w aplikacji administratora**
+(ekran „Dostęp” → „Odbierz dostęp”). Skutek natychmiastowy:
 
 - konto mechanika oznaczone jako zablokowane,
 - wszystkie jego telefony dostają `WYCZYSC` przy najbliższym kontakcie i kasują
@@ -153,9 +182,10 @@ mechaniku. Skutek natychmiastowy:
 - wpis w dzienniku działań administratora (kto, kiedy, kogo).
 
 Jeśli telefon jest offline — domyka to auto‑wipe z A4.
-`zablokuj_mechanika()` / `zablokuj_urzadzenie()` / `wyrejestruj_urzadzenie()`
-w [0003](supabase/migracje/0003_funkcje_synchronizacji.sql) i
-[0008](supabase/migracje).
+`admin_zablokuj_mechanika()` w
+[0011_funkcje_administratora.sql](supabase/migracje/0011_funkcje_administratora.sql)
+sprawdza uprawnienia niezależnie od funkcji brzegowej i pilnuje, żeby warsztat
+nie został bez żadnego czynnego administratora.
 
 ### A7 — Metadane EXIF i GPS w zdjęciach ➖
 
@@ -174,8 +204,9 @@ blokada aplikacji: nie otwiera niczego w internecie, więc jego wyciek nie daje
 dostępu do bazy. Sam kod parowania też nie jest sekretem — bez zgody
 administratora i bez sekretu zapisanego w Keychain nic nie znaczy.
 
-Hasło do **panelu administratora** to zwykłe hasło (`HASLO_PANELU`), ale panel
-nasłuchuje wyłącznie na `127.0.0.1`.
+Administrator wchodzi do aplikacji tak samo jak mechanik — nie ma osobnego
+panelu ani osobnego hasła. Jego dodatkowe uprawnienia wiszą na roli w bazie
+i tokenie urządzenia, a nie na haśle, które dałoby się wyłudzić.
 
 ### A10 — Wyniesienie danych przez pracownika ✅
 
@@ -183,7 +214,7 @@ nasłuchuje wyłącznie na `127.0.0.1`.
   napisane wprost w [frontend/src/app/ustawienia.tsx](frontend/src/app/ustawienia.tsx).
 - **Dziennik dostępu:** każde otwarcie kartoteki klienta i zgłoszenia trafia do
   tabeli `dziennik_dostepu` (kto, kiedy, co). Kolejkowany lokalnie, więc działa
-  też offline. Podgląd: panel → zakładka Dziennik.
+  też offline. Podgląd: tabela `dziennik_dostepu` w panelu Supabase.
 - Wąskie okno synchronizacji (A3) ogranicza zasięg tego, co pracownik ma w ręku.
 - 👤 Umowa o zachowaniu poufności z mechanikami — poza kodem.
 
@@ -192,11 +223,9 @@ nasłuchuje wyłącznie na `127.0.0.1`.
 - Edge Functions logują **wyłącznie kody zdarzeń i liczby** — nigdy treści
   żądań ani danych klienta (`log()` w
   [supabase/funkcje/sync/index.ts](supabase/funkcje/sync/index.ts)).
-- Panel administratora loguje metodę i ścieżkę, nigdy ciała żądania; przed
-  zapisem błędu przechodzi przez `bezDanychOsobowych()`
-  ([backend/src/pomocnicze.js](backend/src/pomocnicze.js)), który zamienia
-  `nazwa`, `telefon`, `email`, `adres`, `notatki`, `opis`, `tytul`, `token`,
-  `haslo` itd. na `[ukryte]`.
+- Funkcja `admin` loguje wyłącznie kod zdarzenia (`przyznanie_dostepu`,
+  `blokada_mechanika`) — bez imion i bez identyfikatorów w treści logu.
+- Dziennik działań administratora w bazie zapisuje UUID-y, nie dane osobowe.
 - W projekcie nie ma Sentry ani innego crash reportingu. 👤 Jeśli będziesz go
   dodawać, wyłącz wysyłanie ciał żądań i stanu aplikacji.
 
@@ -281,7 +310,8 @@ sam z siebie nie zgłosi błędu:
    więc `+48 601-234-567` = `601 234 567` = `0048601234567`); formularz nowej
    wizyty ostrzega, jeśli **to samo auto ma otwartą wizytę z ostatnich 48 h**.
 2. **Wykrywanie po stronie serwera:** przy zapisie `zapisz_z_telefonu()`
-   dopisuje podejrzane pary do `mozliwe_duplikaty`. Widać je w panelu.
+   dopisuje podejrzane pary do `mozliwe_duplikaty` — do przejrzenia w panelu
+   Supabase, gdy trzeba wyjaśnić bałagan w kartotekach.
 3. **Narzędzie do posprzątania:** w profilu klienta pojawia się propozycja
    „Scal kartoteki” — wizyty przechodzą do starszej kartoteki, nowsza zostaje
    zamknięta, operacja jedzie na serwer jako `scal`.
@@ -330,8 +360,9 @@ To ryzyko potraktowane najpoważniej — trzy niezależne zabezpieczenia:
    ją do kwarantanny. Błąd sieci zostawia ją na miejscu.
    [frontend/src/dane/kolejka.ts](frontend/src/dane/kolejka.ts)
 3. **Widoczność:** licznik „N czeka na wysłanie” na każdym ekranie,
-   ostrzeżenie, gdy najstarsza pozycja czeka ponad dobę, a w panelu
-   administratora kolumna „bez sync (h)” i licznik kwarantanny z alarmem.
+   ostrzeżenie, gdy najstarsza pozycja czeka ponad dobę. Po stronie serwera
+   funkcja `raport_synchronizacji()` pokazuje, który telefon milczy dłużej
+   niż dobę.
 
 **Sprawdzone na żywo:** w jednej paczce wysłano poprawnego klienta, poprawną
 wizytę, zmianę statusu na wartość spoza słownika i zapis do nieistniejącej
@@ -359,8 +390,9 @@ rekord może jeszcze nie dojechać z innego telefonu.
 ### B11 — Ten sam mechanik na dwóch urządzeniach ✅
 
 Obowiązują te same reguły co przy dwóch mechanikach (B1, B12, B3) — nic nie
-jest zakładane o unikalności urządzenia. Panel pokazuje wszystkie telefony
-przypisane do mechanika i pozwala każdy z osobna zablokować lub wyrejestrować.
+jest zakładane o unikalności urządzenia. Ekran „Dostęp” pokazuje wszystkie
+telefony przypisane do mechanika i pozwala każdy z osobna zablokować
+lub wyrejestrować.
 
 ### B12 — Duplikaty z ponowień ✅
 
@@ -391,7 +423,7 @@ Każdy zapis z telefonu jest traktowany jako niezaufany, na trzech poziomach:
 
 ### C1 — Uszkodzenie lub skasowanie bazy na serwerze ✅ 👤
 
-- **Własna kopia u innego podmiotu:** `cd backend && npm run kopia` zrzuca
+- **Własna kopia u innego podmiotu:** `cd narzedzia && npm run kopia` zrzuca
   wszystkie tabele do jednego pliku JSON w katalogu `kopie/`.
 - **Przetestowane odtwarzanie:** `npm run przywroc -- <plik>` (z `--na-sucho`
   do samego sprawdzenia). Odtwarzanie jest idempotentne — upsert po kluczu
@@ -521,5 +553,5 @@ po powrocie usługi wszystko dochodzi. Awaria (5xx) jest zwracana jako
 | 6 | A2 — zero service_role w aplikacji + skaner | ✅ zrobione, 👤 zainstaluj hook |
 | 7 | A12 — wyłączenie kopii zapasowych | ✅ Android sprawdzony, ⚙️ iOS do weryfikacji po buildzie |
 | 8 | B1 — UPDATE tylko na zmienionych kolumnach | ✅ zrobione i **sprawdzone** |
-| 9 | A4 — auto‑wipe po 14 dniach | ✅ zrobione (bez SQLCipher — patrz A4) |
+| 9 | A4 — szyfrowanie lokalnej bazy + auto‑wipe po 14 dniach | ✅ zrobione (SQLCipher włączony) |
 | 10 | C1 — własna kopia u innego dostawcy | ✅ narzędzia gotowe, 👤 uruchom i przetestuj odtworzenie |

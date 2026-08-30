@@ -1,15 +1,19 @@
 /**
- * Konfiguracja panelu administratora.
+ * Konfiguracja narzedzi dostawcy uslugi.
  *
- * A2 - KLUCZOWA ZASADA TEGO PLIKU:
- * `SUPABASE_SERVICE_ROLE_KEY` omija RLS i daje pelny dostep do bazy. Zyje
- * wylacznie tutaj, na komputerze w warsztacie, w pliku backend/.env, ktory
- * jest w .gitignore. Nigdy nie trafia do aplikacji mobilnej ani do repozytorium.
+ * To NIE JEST serwer. Nic tu nie dziala w tle i nic nie musi byc uruchomione,
+ * zeby warsztat pracowal. Caly system to Supabase (baza + funkcje brzegowe)
+ * i aplikacja na telefonach mechanikow.
  *
- * Panel nasluchuje domyslnie na 127.0.0.1 - jest widoczny TYLKO z tego
- * komputera. To celowe: gdyby wisial na 0.0.0.0, kazdy w sieci Wi-Fi
- * warsztatu probowalby sie do niego dobrac, a za nim stoi klucz omijajacy
- * wszystkie zabezpieczenia bazy.
+ * Te skrypty odpalasz z reki, kilka razy w zyciu projektu:
+ *   - wystawienie kodu zaproszenia dla nowego warsztatu,
+ *   - kopia zapasowa poza Supabase i jej odtworzenie,
+ *   - skan sekretow w repozytorium,
+ *   - jednorazowy import danych ze starej, lokalnej bazy SQLite.
+ *
+ * A2: klucz service_role omija RLS. Zyje wylacznie w tym pliku .env
+ * (jest w .gitignore) oraz w sekretach Edge Functions po stronie Supabase.
+ * Nigdy w aplikacji mobilnej, nigdy w repozytorium.
  */
 import path from 'node:path';
 import fs from 'node:fs';
@@ -18,11 +22,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const KATALOG_PROJEKTU = path.resolve(__dirname, '..', '..');
-export const KATALOG_BACKENDU = path.resolve(__dirname, '..');
-export const KATALOG_PUBLICZNY = path.join(__dirname, 'publiczne');
+export const KATALOG_NARZEDZI = path.resolve(__dirname, '..');
 
 // Minimalny loader .env (bez dodatkowej zaleznosci).
-const sciezkaEnv = path.join(KATALOG_BACKENDU, '.env');
+const sciezkaEnv = path.join(KATALOG_NARZEDZI, '.env');
 if (fs.existsSync(sciezkaEnv)) {
   for (const linia of fs.readFileSync(sciezkaEnv, 'utf8').split(/\r?\n/)) {
     const t = linia.trim();
@@ -35,25 +38,28 @@ if (fs.existsSync(sciezkaEnv)) {
   }
 }
 
-export const PORT = Number(process.env.PORT || 4000);
-/** 127.0.0.1 = panel dostepny wylacznie z tego komputera (patrz naglowek). */
-export const HOST = process.env.HOST || '127.0.0.1';
-
 export const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 export const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-export const HASLO_PANELU = process.env.HASLO_PANELU || '';
-export const NAZWA_ADMINISTRATORA = process.env.NAZWA_ADMINISTRATORA || 'administrator';
 
 /** Katalog na kopie zapasowe robione skryptem `npm run kopia`. */
 export const KATALOG_KOPII = process.env.KATALOG_KOPII
   ? path.resolve(process.env.KATALOG_KOPII)
   : path.join(KATALOG_PROJEKTU, 'kopie');
 
-/** Lista brakow w konfiguracji - serwer wypisuje ja przy starcie. */
+/** Lista brakow w konfiguracji - skrypty sprawdzaja ja przed startem. */
 export function brakiKonfiguracji() {
   const braki = [];
   if (!SUPABASE_URL) braki.push('SUPABASE_URL');
   if (!SERVICE_ROLE_KEY) braki.push('SUPABASE_SERVICE_ROLE_KEY');
-  if (!HASLO_PANELU) braki.push('HASLO_PANELU');
   return braki;
+}
+
+/** Wspolne wyjscie z bledem konfiguracji. */
+export function wymagajKonfiguracji() {
+  const braki = brakiKonfiguracji();
+  if (braki.length) {
+    console.error(`Brakuje w narzedzia/.env: ${braki.join(', ')}`);
+    console.error('Wzor: narzedzia/.env.example');
+    process.exit(1);
+  }
 }

@@ -1,8 +1,8 @@
 # zaleznosci
 node_modules/
 
-# konfiguracja lokalna - TU SIEDZI KLUCZ service_role (ryzyko A2)
-backend/.env
+# konfiguracja narzedzi - TU SIEDZI KLUCZ service_role (ryzyko A2)
+narzedzia/.env
 .env
 .env.local
 

@@ -46,8 +46,8 @@ const WZORY = [
   { nazwa: 'Token GitHub', wzor: /gh[pousr]_[A-Za-z0-9]{30,}/g },
   { nazwa: 'Klucz AWS', wzor: /AKIA[0-9A-Z]{16}/g },
   {
-    nazwa: 'Wypelnione HASLO_PANELU / SERVICE_ROLE_KEY w pliku sledzonym przez gita',
-    wzor: /^(?:HASLO_PANELU|SUPABASE_SERVICE_ROLE_KEY)=.+$/gm,
+    nazwa: 'Wypelniony SERVICE_ROLE_KEY w pliku sledzonym przez gita',
+    wzor: /^SUPABASE_SERVICE_ROLE_KEY=.+$/gm,
     tylkoWPlikach: /\.env$/,
   },
 ];
@@ -108,7 +108,7 @@ function zainstalujHook() {
   fs.writeFileSync(sciezka, [
     '#!/bin/sh',
     '# A2: blokada commita z sekretem w tresci.',
-    'node backend/scripts/skanuj-sekrety.js || {',
+    'node narzedzia/scripts/skanuj-sekrety.js || {',
     '  echo ""',
     '  echo "COMMIT ZATRZYMANY: w plikach jest sekret."',
     '  echo "Usun go, a jesli juz gdzies wyciekl - ZROTUJ klucz w Supabase."',
