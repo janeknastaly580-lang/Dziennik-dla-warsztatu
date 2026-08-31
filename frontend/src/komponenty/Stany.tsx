@@ -16,22 +16,26 @@ export function Ladowanie({ tekst = 'Wczytywanie...' }: { tekst?: string }) {
 
 export function KomunikatBledu({
   tresc,
+  tytul = 'Nie udalo sie pobrac danych',
+  tekstPonow = 'Sprobuj ponownie',
   onPonow,
   onUstawienia,
 }: {
   tresc: string;
+  tytul?: string;
+  tekstPonow?: string;
   onPonow?: () => void;
   onUstawienia?: () => void;
 }) {
   return (
     <View style={style.srodek}>
       <View style={style.kartaBledu}>
-        <Text style={style.tytulBledu}>Nie udalo sie pobrac danych</Text>
+        <Text style={style.tytulBledu}>{tytul}</Text>
         <Text style={style.trescBledu}>{tresc}</Text>
         <View style={style.przyciski}>
           {onPonow ? (
             <Pressable style={[style.przycisk, style.przyciskGlowny]} onPress={onPonow}>
-              <Text style={style.tekstGlowny}>Sprobuj ponownie</Text>
+              <Text style={style.tekstGlowny}>{tekstPonow}</Text>
             </Pressable>
           ) : null}
           {onUstawienia ? (

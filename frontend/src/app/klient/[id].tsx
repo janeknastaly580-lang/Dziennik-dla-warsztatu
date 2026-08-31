@@ -24,7 +24,6 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import KafelekWizyty from '../../komponenty/KafelekWizyty';
 import ZakladkiAut from '../../komponenty/ZakladkiAut';
 import Potwierdzenie from '../../komponenty/Potwierdzenie';
-import PasekSynchronizacji from '../../komponenty/PasekSynchronizacji';
 import { KomunikatBledu, Ladowanie, Pusto } from '../../komponenty/Stany';
 import {
   klienciZTymSamymTelefonem, profilKlienta, scalKlientow, wizytyKlienta, zapiszWDzienniku,
@@ -130,7 +129,6 @@ export default function EkranProfiluKlienta() {
 
   const naglowek = (
     <View>
-      <PasekSynchronizacji />
 
       {/* B3: propozycja scalenia duplikatu zalozonego na innym telefonie */}
       {duplikaty.map((d) => (
@@ -253,7 +251,6 @@ export default function EkranProfiluKlienta() {
               tytul={wybraneAuto === null
                 ? 'Brak wizyt w historii'
                 : 'To auto nie ma jeszcze zadnej wizyty'}
-              opis={'Uzyj duzego przycisku "DODAJ" na gorze ekranu, aby zapisac pierwsza usterke.'}
             />
           )
         }

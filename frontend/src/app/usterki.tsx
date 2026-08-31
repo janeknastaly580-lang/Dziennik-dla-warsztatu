@@ -17,7 +17,6 @@ import {
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 
 import KafelekWizyty from '../komponenty/KafelekWizyty';
-import PasekSynchronizacji from '../komponenty/PasekSynchronizacji';
 import { Ladowanie, Pusto } from '../komponenty/Stany';
 import { otwarteUsterki } from '../dane/repozytorium';
 import { useAplikacja } from '../dane/kontekst';
@@ -110,7 +109,6 @@ export default function EkranOtwartychUsterek() {
       {naglowekEkranu}
 
       <View style={style.gora}>
-        <PasekSynchronizacji />
         <View style={style.filtry}>
           <PrzyciskFiltra
             etykieta="W trakcie"

@@ -16,10 +16,16 @@ komputerze zostaje tylko polecenie, które go zleca.
 
 ```bash
 cd frontend
-npx eas login
-npx eas build:configure
-npx eas build --platform android --profile preview
+npx eas-cli@latest login
+npx eas-cli@latest init
+npx eas-cli@latest build --platform android --profile preview
 ```
+
+Narzędzie nazywa się **`eas-cli`**, nie `eas`. `eas init` dopisze do `app.json`
+identyfikator projektu EAS — to jedyna zmiana, jaką robi.
+
+Stan projektu przed buildem jest czysty: `npx expo-doctor` → **21/21 sprawdzeń
+przeszło**. Jeśli kiedyś coś dołożysz, uruchom go ponownie przed buildem.
 
 `preview` daje plik **.apk** do zainstalowania wprost na telefonach warsztatu
 (profil jest już w `eas.json`). Po zakończeniu EAS poda link do pobrania.
@@ -66,14 +72,11 @@ if var katalogDanych = FileManager.default.urls(for: .documentDirectory, in: .us
 
 ## 🔴 2. Uruchom pierwszy warsztat
 
-Kod zaproszenia dla pierwszego warsztatu jest **już wystawiony**:
+Pierwszy warsztat jest **już uruchomiony** — kod `V8KH-ZN9K-LM3X` został
+wykorzystany 31.08.2026 i założył warsztat „Warsztat" (prefiks `W1`) wraz
+z kontem administratora „Administrator warsztatu".
 
-```
-V8KH-ZN9K-LM3X          ważny do 29.10.2026
-Warsztat · administrator: „Administrator warsztatu"
-```
-
-Kolejne wystawiasz tak:
+Kolejne kody wystawiasz tak:
 
 ```bash
 cd narzedzia
@@ -87,14 +90,21 @@ Przebieg u klienta — **bez Twojego udziału po przekazaniu kodu**:
 2. Dotyka „Mam kod zaproszenia", wpisuje kod
    → aplikacja zakłada warsztat i jego konto ADMINISTRATORA
 3. Ustawia dowolne własne hasło
-4. Mechanik uruchamia aplikację na swoim telefonie → widzi 8-znakowy KOD
-5. Podaje kod właścicielowi (telefonicznie, SMS-em, jakkolwiek)
-6. Właściciel: ikona klucza ⚿ → wpisuje kod → wybiera mechanika → Przyznaj
-7. Telefon mechanika w kilka sekund prosi o ustawienie własnego hasła
+4. Mechanik uruchamia aplikację na swoim telefonie, wpisuje SWOJE
+   imię i nazwisko i dotyka „Poproś o dostęp"
+5. Właściciel: ikona klucza ⚿ → widzi na liście imię i nazwisko mechanika
+   → klika „Zatwierdź". Niczego nie wpisuje, konta nie zakłada
+6. Telefon mechanika w kilka sekund prosi o ustawienie własnego hasła
 ```
 
 Kod zaproszenia jest **jednorazowy**. Kto go użyje, zostaje administratorem
 tego warsztatu — przekazuj go tak, jak przekazujesz hasło.
+
+**Administrator jest dokładnie jeden na warsztat.** Pilnuje tego indeks
+unikalny w bazie, nie tylko interfejs. Każdy zatwierdzony telefon dostaje rolę
+„mechanik". Nie da się też zablokować samego siebie ani odciąć telefonu,
+na którym się właśnie pracuje — warsztat nie zostanie bez nikogo, kto może
+wpuścić ludzi z powrotem.
 
 **Pierwszą synchronizację rób po Wi-Fi** — wtedy telefon ściąga większą paczkę.
 
@@ -116,9 +126,10 @@ Ten test decyduje, czy wolno wdrożyć system u klienta. Wykonaj dokładnie:
 | Ekran parowania („podaj kod administratorowi") | ❌ **nie wdrażasz** |
 | Pusta lista klientów | ❌ **nie wdrażasz** |
 
-Przy okazji: dodaj klienta w trybie samolotowym → ma się zapisać i pokazać
-„⏱ czeka na wysłanie". Wyłącz tryb samolotowy → licznik ma spaść do zera
-w ciągu ~2 minut.
+Przy okazji: dodaj klienta w trybie samolotowym → ma się zapisać bez żadnego
+ostrzeżenia na ekranie. Wejdź w ⚙ *Aplikacja i synchronizacja* → mała kropka
+u góry ekranu ma pokazać liczbę czekających zmian. Wyłącz tryb samolotowy →
+w kilka sekund ma się zmienić w zielony ✓, bez dotykania czegokolwiek.
 
 ---
 
@@ -145,13 +156,23 @@ cd narzedzia && npm run skanuj
 
 ---
 
-## 🟠 5. Wymuś blokadę ekranu na telefonach *(ryzyko A4)*
+## 🔴 5. Wymuś blokadę ekranu na telefonach *(ryzyko A4 i A5)*
 
-Lokalna baza jest szyfrowana SQLCipherem, a klucz leży w Keychain / Keystore.
-**Keystore chroni klucz tylko wtedy, gdy telefon ma ustawiony PIN lub odcisk
-palca.** Bez tego cała warstwa szyfrowania jest do obejścia.
+Dwa powody, oba wystarczające same z siebie:
 
-Na każdym telefonie służbowym ustaw kod blokady i włącz biometrię.
+1. Lokalna baza jest szyfrowana SQLCipherem, a klucz leży w Keychain /
+   Keystore. **Keystore chroni klucz tylko wtedy, gdy telefon ma ustawiony PIN
+   lub odcisk palca.** Bez tego cała warstwa szyfrowania jest do obejścia.
+2. Aplikacja **nie blokuje się już sama po 5 minutach bezczynności ani przy
+   przejściu w tło** (zmiana na życzenie warsztatu — mechanicy wpisywali hasło
+   kilkanaście razy dziennie i zaczynali ustawiać hasła jednoznakowe). Hasło
+   jest pytane raz, przy uruchomieniu aplikacji. Odblokowany telefon zostawiony
+   na warsztacie pokazuje więc dane klientów, dopóki nie zablokuje się ekran
+   samego telefonu.
+
+Na każdym telefonie służbowym ustaw kod blokady, jak najkrótszy czas do
+automatycznego wygaszenia ekranu i włącz biometrię. To już nie jest dobra
+praktyka, tylko warunek działania modelu bezpieczeństwa.
 
 ---
 
@@ -176,7 +197,7 @@ Kopia obok oryginału nie jest kopią zapasową. Ustaw cotygodniowe przypomnieni
 **Przetestuj odtwarzanie, zanim będzie potrzebne:**
 
 1. Załóż drugi, pusty projekt Supabase.
-2. Wykonaj na nim migracje z `supabase/migracje/` po kolei (0001…0011).
+2. Wykonaj na nim migracje z `supabase/migracje/` po kolei (0001…0012).
 3. Podmień `SUPABASE_URL` w `narzedzia/.env` na projekt testowy.
 4. `npm run przywroc -- kopie/plik.json --na-sucho`, potem bez `--na-sucho`.
 5. Sprawdź liczniki, wróć do `.env` produkcyjnego.
@@ -254,11 +275,12 @@ wszystkich".
 
 ## Czego świadomie nie ma — i dlaczego
 
-- **Wersja webowa aplikacji.** W przeglądarce nie istnieje Keychain/Keystore,
-  więc token urządzenia, hasło i klucz szyfrowania bazy nie miałyby gdzie
-  bezpiecznie leżeć. To był powód błędu `wa-sqlite.wasm` na `localhost:8081` —
-  target `web` został usunięty, bo połowa modelu bezpieczeństwa tam nie
-  działa. Cel to APK/IPA.
+- **Wersja webowa jako produkt.** `npm run web` działa i pokazuje cały
+  interfejs na `http://localhost:8081` — służy do oglądania i pokazywania
+  aplikacji, nie do pracy warsztatu. W przeglądarce nie istnieje
+  Keychain/Keystore ani SQLCipher, więc token urządzenia, hasło i klucz
+  szyfrowania bazy leżą tam w zwykłym `localStorage`. Aplikacja mówi o tym
+  pomarańczowym paskiem przez cały czas. Do warsztatu idzie APK/IPA.
 - **Panel administratora na Twoim komputerze.** Zarządzanie dostępem żyje
   w aplikacji, pod rolą `administrator`. Nic nie musi być uruchomione, żeby
   warsztat pracował.

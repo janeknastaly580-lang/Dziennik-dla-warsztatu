@@ -18,7 +18,6 @@ import { Stack, useFocusEffect, useRouter } from 'expo-router';
 
 import KafelekKlienta from '../komponenty/KafelekKlienta';
 import PoleWyszukiwania from '../komponenty/PoleWyszukiwania';
-import PasekSynchronizacji, { OstrzezenieSynchronizacji } from '../komponenty/PasekSynchronizacji';
 import { Ladowanie, Pusto } from '../komponenty/Stany';
 import { listaKlientow } from '../dane/repozytorium';
 import { useAplikacja } from '../dane/kontekst';
@@ -129,8 +128,6 @@ export default function EkranListyKlientow() {
       {naglowekEkranu}
 
       <View style={style.gora}>
-        <PasekSynchronizacji />
-        <OstrzezenieSynchronizacji />
         <PoleWyszukiwania wartosc={fraza} onZmiana={setFraza} />
 
         <View style={style.pasekInformacji}>

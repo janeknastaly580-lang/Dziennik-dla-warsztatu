@@ -53,7 +53,6 @@ function KafelekDuzy({ wizyta, onPress, ukryjAuto, klient }: Props) {
     przebieg,
     // D5: mechanik ma widziec, czy jego zapis juz dotarl na serwer.
     // Bez tego niepewnosc konczy sie wpisaniem tego samego drugi raz (B3).
-    wizyta.oczekuje ? '⏱ czeka na wyslanie' : null,
   ].filter(Boolean).join('   ·   ');
 
   return (
@@ -178,7 +177,6 @@ function KafelekMaly({ wizyta, onPress, ukryjAuto, klient }: Props) {
     ukryjAuto ? null : opisAuta(wizyta.auto),
     formatujDate(wizyta.data_wizyty),
     formatujKwote(wizyta.koszt),
-    wizyta.oczekuje ? '⏱ czeka' : null,   // D5
   ].filter(Boolean).join('  ·  ');
 
   return (

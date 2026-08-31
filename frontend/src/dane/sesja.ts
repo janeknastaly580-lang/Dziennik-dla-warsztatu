@@ -23,8 +23,9 @@
  *      w tlo. Nie polegamy na blokadzie systemowej telefonu.
  */
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+
+import { czytaj, skasuj, zapisz } from './pamiecBezpieczna';
 
 import { MAKS_PROB_HASLA } from './konfiguracja';
 import { pobierzMeta, skasujKluczBazy, ustawMeta, wyczyscDaneWarsztatu } from './baza';
@@ -36,15 +37,6 @@ const K_SOL = 'warsztat_haslo_sol';
 const K_WERYFIKATOR = 'warsztat_haslo_weryfikator';
 const K_PROBY = 'warsztat_proby';
 
-/** Klucze zostaja na tym urzadzeniu - nie wedruja z kopia zapasowa (A4/A12). */
-const OPCJE: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-};
-
-const czytaj = (k: string) => SecureStore.getItemAsync(k, OPCJE).catch(() => null);
-const zapisz = (k: string, v: string) => SecureStore.setItemAsync(k, v, OPCJE);
-const skasuj = (k: string) => SecureStore.deleteItemAsync(k, OPCJE).catch(() => undefined);
-
 /* ---------------------------- token urzadzenia -------------------------- */
 
 export type ZgloszenieParowania = {
@@ -52,6 +44,9 @@ export type ZgloszenieParowania = {
   sekret: string;
   kod: string;
   wygasa_o: string;
+  /** Imie i nazwisko podane przez mechanika - pokazujemy je na ekranie
+   *  oczekiwania, zeby mogl sprawdzic, ze nie ma literowki. */
+  imie?: string;
 };
 
 export const pobierzToken = () => czytaj(K_TOKEN);

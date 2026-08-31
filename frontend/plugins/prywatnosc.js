@@ -17,7 +17,7 @@
  * Wtyczka dziala przy `expo prebuild` / `eas build`; w Expo Go nie ma
  * zastosowania - i dlatego Expo Go nadaje sie tylko do prob, nie do pracy.
  */
-const { withAndroidManifest, withAppDelegate, withInfoPlist } = require('@expo/config-plugins');
+const { withAndroidManifest, withAppDelegate, withInfoPlist } = require('expo/config-plugins');
 
 const ZNACZNIK = 'warsztat-a12-bez-kopii';
 
@@ -42,7 +42,7 @@ function androidBezKopii(config) {
  * wskazywalby na nieistniejacy zasob i build by sie wywalil.
  */
 function androidRegulyEkstrakcji(config) {
-  const { withDangerousMod } = require('@expo/config-plugins');
+  const { withDangerousMod } = require('expo/config-plugins');
   const fs = require('fs');
   const path = require('path');
 

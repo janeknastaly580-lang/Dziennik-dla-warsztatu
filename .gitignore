@@ -1,10 +1,17 @@
 # zaleznosci
 node_modules/
 
-# konfiguracja narzedzi - TU SIEDZI KLUCZ service_role (ryzyko A2)
+# KLUCZE SEKRETNE - service_role, hasla, klucze API. Nigdy w repozytorium.
 narzedzia/.env
 .env
 .env.local
+
+# WYJATEK: frontend/.env trzyma WYLACZNIE zmienne EXPO_PUBLIC_*, ktore Expo
+# i tak wkleja na stale do paczki .apk / .ipa. Sa publiczne z definicji, wiec
+# ukrywanie ich niczego nie chroni, a ich brak w repozytorium zepsulby build
+# w chmurze EAS. app.config.js przerywa build, jesli trafi tam sekret.
+!frontend/.env
+!frontend/.env.example
 
 # kopie zapasowe - zawieraja pelna baze klientow, nie trafiaja do repozytorium
 kopie/

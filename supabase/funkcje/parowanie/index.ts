@@ -11,11 +11,14 @@
  * moze tez dostep odebrac - wtedy telefon czysci lokalna baze.
  *
  * Przebieg drogi B:
- *   1. telefon:  { akcja: "zglos" }
+ *   1. telefon:  { akcja: "zglos", imie: "Jan Kowalski" }
  *                -> dostaje KOD (8 znakow, pokazuje go na ekranie)
  *                   i SEKRET (256 bitow, trzyma u siebie)
- *   2. mechanik czyta kod administratorowi (telefonicznie, SMS-em, jakkolwiek)
- *   3. administrator w panelu: "przyznaj dostep" + wybor mechanika
+ *                Imie i nazwisko wpisuje SAM MECHANIK - nikt inny nie zna
+ *                pisowni jego nazwiska lepiej niz on.
+ *   2. administrator widzi na swojej liscie gotowy wiersz (imie + kod)
+ *   3. administrator klika "Zatwierdz". Nie wpisuje ani jednego znaku;
+ *      konto mechanika zaklada sie samo z podanego imienia.
  *   4. telefon:  { akcja: "sprawdz", id, sekret }
  *                -> JEDEN RAZ odbiera token urzadzenia; kod i sekret gina
  *   5. telefon prosi mechanika o ustawienie hasla i melduje
@@ -150,6 +153,9 @@ Deno.serve(async (req: Request) => {
             sekret_hash: await sha256(sekret),
             kod_wygasa_o: wygasa,
             nazwa_urzadzenia: tekst(cialo.nazwa_urzadzenia, 120),
+            // Imie i nazwisko deklarowane przez mechanika. Zwykly tekst -
+            // niczego nie autoryzuje, sluzy tylko za nazwe zakladanego konta.
+            imie_zgloszone: tekst(cialo.imie, 120),
             platforma: ["ios", "android", "web"].includes(String(cialo.platforma))
               ? String(cialo.platforma)
               : "inne",

@@ -10,6 +10,7 @@
  *
  * Kod wyjscia 1 = znaleziono cos podejrzanego (hook zablokuje commit).
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -46,9 +47,20 @@ const WZORY = [
   { nazwa: 'Token GitHub', wzor: /gh[pousr]_[A-Za-z0-9]{30,}/g },
   { nazwa: 'Klucz AWS', wzor: /AKIA[0-9A-Z]{16}/g },
   {
-    nazwa: 'Wypelniony SERVICE_ROLE_KEY w pliku sledzonym przez gita',
-    wzor: /^SUPABASE_SERVICE_ROLE_KEY=.+$/gm,
+    nazwa: 'Wypelniony klucz sekretny w pliku .env',
+    wzor: /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DB_PASSWORD)=.+$/gm,
     tylkoWPlikach: /\.env$/,
+  },
+  {
+    // Najgrozniejsza pomylka w tym projekcie: sekret pod prefiksem, ktory
+    // Expo wkleja na stale do paczki .apk / .ipa. Taki klucz jest publiczny
+    // w chwili zbudowania aplikacji - nawet jesli plik .env nigdy nie trafi
+    // do repozytorium. app.config.js lapie to przy buildzie, a skaner tutaj.
+    nazwa: 'SEKRET pod prefiksem EXPO_PUBLIC_ (trafilby do paczki .apk!)',
+    wzor: /^EXPO_PUBLIC_[A-Z0-9_]*(?:SERVICE_ROLE|SECRET|PASSWORD|PRIVATE)[A-Z0-9_]*=.+$/gm,
+    // Nie ma znaczenia, czy plik jest w .gitignore - Expo i tak wklei
+    // te wartosc do paczki aplikacji przy budowaniu.
+    zawszePowazne: true,
   },
 ];
 
@@ -67,11 +79,29 @@ function* pliki(katalog) {
   }
 }
 
-/** Pliki wymienione w .gitignore i tak nie trafia do repozytorium. */
+/**
+ * Czy git faktycznie pominie ten plik?
+ *
+ * Pytamy o to samego gita zamiast powtarzac reguly z .gitignore w drugim
+ * miejscu - inaczej skaner zaczalby klamac przy pierwszej zmianie regul.
+ * `frontend/.env` jest celowym wyjatkiem od reguly `.env`: trzyma wylacznie
+ * klucze publiczne EXPO_PUBLIC_* i JEST sledzony, wiec sekret w nim to
+ * prawdziwy wyciek.
+ */
 function ignorowanePrzezGita(wzgledna) {
-  const znormalizowana = wzgledna.replace(/\\/g, '/');
-  return znormalizowana.endsWith('/.env') || znormalizowana === '.env'
-    || znormalizowana.startsWith('kopie/');
+  try {
+    // exit 0 = plik jest ignorowany, exit 1 = trafi do repozytorium
+    execFileSync('git', ['check-ignore', '-q', wzgledna], {
+      cwd: KATALOG_PROJEKTU, stdio: 'ignore',
+    });
+    return true;
+  } catch (err) {
+    if (err.status === 1) return false;
+    // Brak gita albo brak repozytorium - zakladamy najgorsze, czyli ze plik
+    // trafi do repozytorium. Lepiej falszywy alarm niz przeoczony sekret.
+    const znormalizowana = wzgledna.replace(/\\/g, '/');
+    return znormalizowana === 'narzedzia/.env' || znormalizowana.startsWith('kopie/');
+  }
 }
 
 function skanuj() {
@@ -82,13 +112,13 @@ function skanuj() {
     const wIgnorze = ignorowanePrzezGita(wzgledna);
     const tresc = fs.readFileSync(plik, 'utf8');
 
-    for (const { nazwa, wzor, sprawdz, tylkoWPlikach } of WZORY) {
+    for (const { nazwa, wzor, sprawdz, tylkoWPlikach, zawszePowazne } of WZORY) {
       if (tylkoWPlikach && !tylkoWPlikach.test(wzgledna)) continue;
       wzor.lastIndex = 0;
       for (const dopasowanie of tresc.matchAll(wzor)) {
         if (sprawdz && !sprawdz(dopasowanie[0])) continue;
         const linia = tresc.slice(0, dopasowanie.index).split('\n').length;
-        znalezione.push({ plik: wzgledna, linia, nazwa, wIgnorze });
+        znalezione.push({ plik: wzgledna, linia, nazwa, wIgnorze: wIgnorze && !zawszePowazne });
       }
     }
   }

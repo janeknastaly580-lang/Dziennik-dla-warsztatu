@@ -102,7 +102,15 @@ export type OdpowiedzZgloszenia = {
   wygasa_o: string;
 };
 
-export function zglosUrzadzenie(dane: { platforma: string; nazwa_urzadzenia: string }) {
+/**
+ * Prosba o dostep. `imie` wpisuje SAM MECHANIK na swoim telefonie - z tego
+ * powstanie potem jego konto, wiec pisownie nazwiska ustala osoba, ktora zna
+ * ja najlepiej. Samo imie niczego nie autoryzuje: dostep i tak przyznaje
+ * administrator, a token odbiera wylacznie ten telefon, ktory ma sekret.
+ */
+export function zglosUrzadzenie(dane: {
+  platforma: string; nazwa_urzadzenia: string; imie: string;
+}) {
   return wywolaj('parowanie', { akcja: 'zglos', ...dane }) as Promise<OdpowiedzZgloszenia>;
 }
 
@@ -227,6 +235,8 @@ export type MechanikAdmina = {
 
 export type OczekujaceUrzadzenie = {
   kod: string;
+  /** Imie i nazwisko wpisane przez mechanika na jego telefonie. */
+  imie: string | null;
   nazwa: string | null;
   platforma: string | null;
   wersja: string | null;
@@ -252,7 +262,24 @@ export function dodajMechanika(token: string, imie: string, rola: Rola = 'mechan
   return wywolaj('admin', { akcja: 'dodaj_mechanika', imie, rola }, token) as Promise<WynikAkcji>;
 }
 
-/** Przyznanie dostepu: kod z ekranu telefonu + wybrany mechanik. Bez hasla. */
+/**
+ * Zatwierdzenie telefonu jednym klikiem.
+ *
+ * Administrator nie wpisuje niczego - podaje tylko kod wiersza, ktory dotknal.
+ * Konto mechanika zaklada sie po stronie serwera, z imienia podanego przez
+ * samego mechanika przy zgloszeniu.
+ */
+export function zatwierdzUrzadzenie(token: string, kod: string) {
+  return wywolaj('admin', { akcja: 'zatwierdz', kod }, token) as Promise<
+    WynikAkcji & { imie?: string; nowe_konto?: boolean }
+  >;
+}
+
+/**
+ * Starsza droga: kod + recznie wskazane konto mechanika. Aplikacja jej juz
+ * nie uzywa (zostala zastapiona przez `zatwierdzUrzadzenie`), ale serwer
+ * nadal ja obsluguje - na telefonach moze jeszcze chodzic poprzednia wersja.
+ */
 export function przyznajDostep(token: string, kod: string, mechanikId: string) {
   return wywolaj('admin', {
     akcja: 'przyznaj', kod, mechanik_id: mechanikId,

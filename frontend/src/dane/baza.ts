@@ -12,41 +12,50 @@
  * D5 - kolumna `oczekuje` mowi, czy rekord czeka jeszcze na wyslanie.
  *      Z tego biora sie zegarek i ptaszek przy kafelkach.
  *
- * A4  - Plik bazy jest SZYFROWANY (SQLCipher). Klucz nie ma go w kodzie:
+ * A4  - Plik bazy jest SZYFROWANY (SQLCipher) NA TELEFONIE. Klucza nie ma
+ *       w kodzie:
  *       powstaje losowo przy pierwszym uruchomieniu i lezy w Keychain /
  *       Keystore z flaga "tylko to urzadzenie". Wyjecie karty pamieci albo
  *       skopiowanie pliku bazy z zgubionego telefonu daje szyfrogram.
  *       Wymaga wlasnego builda (app.json -> expo-sqlite: useSQLCipher).
+ *       W PRZEGLADARCE SQLCipher nie istnieje - dlatego wersja webowa jest
+ *       wylacznie podgladem interfejsu i mowi o tym wprost.
  *
  * A12 - Wtyczka `plugins/prywatnosc.js` wyklucza dane aplikacji z kopii
  *       zapasowej iCloud i Google Drive. Sprawdz to po zbudowaniu, nie zakladaj.
  */
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
+
+import { TRYB_PODGLADU, czytaj, skasuj, zapisz } from './pamiecBezpieczna';
 
 export const NAZWA_BAZY = 'warsztat.db';
 
 const K_KLUCZ_BAZY = 'warsztat_klucz_bazy';
 
-/** Klucz zostaje na tym urzadzeniu - nie wedruje z kopia zapasowa. */
-const OPCJE_KLUCZA: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-};
-
 let polaczenie: SQLite.SQLiteDatabase | null = null;
+/**
+ * Trwajace otwarcie bazy. Bez tego dwa rownolegle wywolania `otworzBaze()`
+ * (a takie zdarzaja sie przy starcie: kontekst aplikacji, sprawdzenie
+ * wygasniecia offline i pierwszy odczyt ekranu ruszaja naraz) otwieraja
+ * DWA polaczenia do tego samego pliku. Na telefonie konczy sie to blokada
+ * zapisu, a w przegladarce rozjezdza sie inicjalizacja WebAssembly
+ * w expo-sqlite i baza w ogole sie nie otwiera
+ * ("Invalid VFS state", potem "Error code 14: unable to open database file").
+ */
+let otwieranie: Promise<SQLite.SQLiteDatabase> | null = null;
 
 /**
  * 256-bitowy klucz szyfrowania lokalnej bazy. Przy pierwszym uruchomieniu
  * losowany i zapisywany w bezpiecznym magazynie systemu; potem tylko czytany.
  */
 async function kluczBazy(): Promise<string> {
-  const istniejacy = await SecureStore.getItemAsync(K_KLUCZ_BAZY, OPCJE_KLUCZA).catch(() => null);
+  const istniejacy = await czytaj(K_KLUCZ_BAZY);
   if (istniejacy && /^[0-9a-f]{64}$/.test(istniejacy)) return istniejacy;
 
   const nowy = Array.from(Crypto.getRandomBytes(32))
     .map((b) => b.toString(16).padStart(2, '0')).join('');
-  await SecureStore.setItemAsync(K_KLUCZ_BAZY, nowy, OPCJE_KLUCZA);
+  await zapisz(K_KLUCZ_BAZY, nowy);
   return nowy;
 }
 
@@ -56,13 +65,14 @@ async function kluczBazy(): Promise<string> {
  * zaszyfrowany nowym kluczem plik zamiast pisac do starego.
  */
 export async function skasujKluczBazy(): Promise<void> {
-  await SecureStore.deleteItemAsync(K_KLUCZ_BAZY, OPCJE_KLUCZA).catch(() => undefined);
+  await skasuj(K_KLUCZ_BAZY);
   try {
     await polaczenie?.closeAsync();
   } catch {
     // Zamkniecie i tak nie moze zablokowac wylogowania.
   }
   polaczenie = null;
+  otwieranie = null;
   await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
 }
 
@@ -140,19 +150,36 @@ const MIGRACJE: string[] = [
  * i nie ma tu miejsca na wstrzykniecie - to 64 znaki szesnastkowe.
  */
 async function otworzZaszyfrowana(): Promise<SQLite.SQLiteDatabase> {
-  const klucz = await kluczBazy();
   const db = await SQLite.openDatabaseAsync(NAZWA_BAZY);
-  await db.execAsync(`PRAGMA key = "x'${klucz}'"`);
+
+  // W przegladarce SQLite jest skompilowany do WebAssembly i nie ma w nim
+  // SQLCipher - PRAGMA key wywalilaby otwarcie bazy. Tryb podgladu dziala
+  // wiec bez szyfrowania, o czym aplikacja informuje paskiem na gorze ekranu.
+  if (!TRYB_PODGLADU) {
+    const klucz = await kluczBazy();
+    await db.execAsync(`PRAGMA key = "x'${klucz}'"`);
+  }
   // Odczyt czegokolwiek udaje sie tylko przy poprawnym kluczu - to jest
   // sprawdzenie, czy plik faktycznie da sie odszyfrowac.
   await db.getFirstAsync('SELECT count(*) AS n FROM sqlite_master');
   return db;
 }
 
-/** Otwiera baze i doprowadza schemat do biezacej wersji. */
+/**
+ * Otwiera baze i doprowadza schemat do biezacej wersji.
+ *
+ * Rownolegle wywolania dostaja TO SAMO otwarcie - nigdy drugiego polaczenia
+ * do tego samego pliku.
+ */
 export async function otworzBaze(): Promise<SQLite.SQLiteDatabase> {
   if (polaczenie) return polaczenie;
+  if (!otwieranie) {
+    otwieranie = otworzIZmigruj().finally(() => { otwieranie = null; });
+  }
+  return otwieranie;
+}
 
+async function otworzIZmigruj(): Promise<SQLite.SQLiteDatabase> {
   let db: SQLite.SQLiteDatabase;
   try {
     db = await otworzZaszyfrowana();

@@ -1,15 +1,21 @@
 /**
  * EKRAN ZARZADZANIA DOSTEPEM - widoczny wylacznie dla administratora warsztatu.
  *
- * Administrator to zwykly mechanik z rola "administrator". Ponad innych moze
- * DOKLADNIE tyle:
+ * Administrator to zwykly mechanik z rola "administrator". W warsztacie jest
+ * DOKLADNIE JEDEN - pilnuje tego indeks unikalny w bazie, a nie tylko ten
+ * ekran. Ponad innych moze dokladnie tyle:
  *
- *   1. PRZYZNAC DOSTEP telefonowi - zdalnie, jednorazowym kodem z jego ekranu,
- *      bez podawania jakiegokolwiek hasla. Telefon zaraz potem sam prosi
- *      mechanika o ustawienie wlasnego hasla.
+ *   1. ZATWIERDZIC TELEFON czekajacy na dostep - jednym przyciskiem. Nie
+ *      wpisuje ani jednego znaku: imie i nazwisko podal juz sam mechanik na
+ *      swoim telefonie, a konto zaklada sie z tego imienia. Telefon zaraz
+ *      potem sam prosi mechanika o ustawienie wlasnego hasla.
  *   2. ODEBRAC DOSTEP - mechanikowi (wszystkie jego telefony) albo pojedynczemu
  *      telefonowi. Zablokowany telefon czysci lokalna baze przy najblizszym
  *      kontakcie z serwerem.
+ *
+ * Samego siebie zablokowac nie moze - ani swojego konta, ani telefonu,
+ * na ktorym wlasnie stoi. Warsztat bez administratora nie mialby juz nikogo,
+ * kto wpuscilby kogokolwiek z powrotem.
  *
  * Nie widzi tu ani jednej kartoteki klienta - to nie jest "wglad we wszystko",
  * tylko zarzadzanie dostepem.
@@ -24,12 +30,12 @@ import {
 } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 
-import { KomunikatFormularza, Pole, Przycisk, Sekcja } from '../komponenty/Formularz';
+import { KomunikatFormularza, Sekcja } from '../komponenty/Formularz';
 import Potwierdzenie from '../komponenty/Potwierdzenie';
 import { KomunikatBledu, Ladowanie } from '../komponenty/Stany';
 import {
-  akcjaNaUrzadzeniu, DaneAdmina, daneAdmina, dodajMechanika, MechanikAdmina,
-  odblokujMechanika, przyznajDostep, UrzadzenieAdmina, zablokujMechanika, BladSieci,
+  akcjaNaUrzadzeniu, DaneAdmina, daneAdmina, MechanikAdmina, odblokujMechanika,
+  UrzadzenieAdmina, zablokujMechanika, zatwierdzUrzadzenie, BladSieci,
 } from '../dane/chmura';
 import { pobierzToken } from '../dane/sesja';
 import { useAplikacja } from '../dane/kontekst';
@@ -56,9 +62,6 @@ export default function EkranAdministracji() {
   const [blad, setBlad] = useState<string | null>(null);
   const [sukces, setSukces] = useState<string | null>(null);
 
-  const [kod, setKod] = useState('');
-  const [wybranyMechanik, setWybranyMechanik] = useState<string | null>(null);
-  const [noweImie, setNoweImie] = useState('');
   const [pytanie, setPytanie] = useState<Pytanie | null>(null);
 
   const wczytaj = useCallback(async (cichoBlad = false) => {
@@ -116,33 +119,12 @@ export default function EkranAdministracji() {
     }
   }, [wczytaj]);
 
-  const przyznaj = useCallback(async () => {
-    if (!kod.trim()) {
-      setBlad('Wpisz kod z ekranu telefonu mechanika.');
-      return;
-    }
-    if (!wybranyMechanik) {
-      setBlad('Wybierz, ktoremu mechanikowi przyznajesz dostep.');
-      return;
-    }
-    const udane = await wykonaj(
-      (t) => przyznajDostep(t, kod.trim().toUpperCase(), wybranyMechanik),
-      'Dostep przyznany. Telefon odbierze go w kilka sekund i poprosi o ustawienie hasla.',
-    );
-    if (udane) { setKod(''); setWybranyMechanik(null); }
-  }, [kod, wybranyMechanik, wykonaj]);
-
-  const dodaj = useCallback(async () => {
-    if (!noweImie.trim()) {
-      setBlad('Podaj imie i nazwisko mechanika.');
-      return;
-    }
-    const udane = await wykonaj(
-      (t) => dodajMechanika(t, noweImie.trim()),
-      'Konto zalozone. Teraz przyznaj dostep telefonowi tego mechanika.',
-    );
-    if (udane) setNoweImie('');
-  }, [noweImie, wykonaj]);
+  /** Jedyna czynnosc przy wpuszczaniu kogos do systemu: jedno dotkniecie. */
+  const zatwierdz = useCallback((u: { kod: string; imie: string | null }) => wykonaj(
+    (t) => zatwierdzUrzadzenie(t, u.kod),
+    `${u.imie ?? 'Telefon'} ma juz dostep. Telefon odbierze go w kilka sekund `
+      + 'i poprosi o ustawienie wlasnego hasla.',
+  ), [wykonaj]);
 
   /* -------------------------------- widok ------------------------------- */
 
@@ -190,66 +172,46 @@ export default function EkranAdministracji() {
         </View>
       ) : null}
 
-      {/* ============ 1. PRZYZNANIE DOSTEPU ============ */}
-      <Sekcja tytul="TELEFONY CZEKAJACE NA DOSTEP">
+      {/* ============ 1. ZATWIERDZANIE JEDNYM KLIKIEM ============ */}
+      <Sekcja tytul="PROSBY O DOSTEP">
         <Text style={style.opis}>
-          Mechanik uruchamia aplikacje i odczytuje Ci kod ze swojego ekranu.
-          Dotknij kodu ponizej albo wpisz go recznie, wskaz mechanika i zatwierdz.
-          Zadnego hasla nie podajesz - telefon sam poprosi mechanika o ustawienie
-          wlasnego.
+          Mechanik podaje na swoim telefonie imie i nazwisko i prosi o dostep.
+          Ty tylko sprawdzasz, czy to rzeczywiscie ta osoba, i klikasz
+          {' '}Zatwierdz. Konto zalozy sie samo.
         </Text>
 
         {dane?.oczekujace?.length ? dane.oczekujace.map((u) => (
-          <Pressable
-            key={u.kod}
-            onPress={() => setKod(u.kod)}
-            style={({ pressed }) => [style.oczekujace, pressed && style.wcisniety]}
-          >
-            <Text style={style.kodTekst}>{u.kod}</Text>
+          <View key={u.kod} style={style.oczekujace}>
             <View style={style.oczekujaceOpis}>
-              <Text style={style.oczekujaceNazwa} numberOfLines={1}>
-                {u.nazwa ?? 'telefon'} · {u.platforma ?? '?'}
+              <Text style={style.oczekujaceImie} numberOfLines={2}>
+                {u.imie ?? 'Telefon bez podanego imienia'}
               </Text>
-              <Text style={style.drobne}>
-                zgloszony {czasLokalny(u.zgloszone_o)}
+              <Text style={style.drobne} numberOfLines={2}>
+                {u.nazwa ?? 'telefon'} · {u.platforma ?? '?'}
+                {'\n'}prosba nr {u.kod} · {czasLokalny(u.zgloszone_o)}
               </Text>
             </View>
-          </Pressable>
+
+            <Pressable
+              onPress={() => zatwierdz(u)}
+              disabled={zajety || !u.imie}
+              accessibilityRole="button"
+              accessibilityLabel={`Zatwierdz dostep dla ${u.imie ?? 'tego telefonu'}`}
+              style={({ pressed }) => [
+                style.zatwierdz,
+                (zajety || !u.imie) && style.zatwierdzNieaktywny,
+                pressed && style.wcisniety,
+              ]}
+            >
+              <Text style={style.zatwierdzTekst}>Zatwierdz</Text>
+            </Pressable>
+          </View>
         )) : (
           <Text style={style.pusto}>
-            Zaden telefon nie czeka. Popros mechanika, zeby otworzyl aplikacje.
+            Nikt nie czeka. Popros mechanika, zeby otworzyl aplikacje i wpisal
+            swoje imie i nazwisko.
           </Text>
         )}
-
-        <Pole
-          etykieta="Kod z ekranu telefonu"
-          value={kod}
-          onChangeText={(t) => setKod(t.toUpperCase())}
-          placeholder="np. 88FVB9D9"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={8}
-        />
-
-        <Text style={style.etykieta}>KOMU PRZYZNAC</Text>
-        <View style={style.wybor}>
-          {(dane?.mechanicy ?? []).filter((m) => !m.zablokowany_o).map((m) => {
-            const aktywny = wybranyMechanik === m.id;
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => setWybranyMechanik(aktywny ? null : m.id)}
-                style={[style.opcja, aktywny && style.opcjaAktywna]}
-              >
-                <Text style={[style.opcjaTekst, aktywny && style.opcjaTekstAktywny]}>
-                  {m.imie}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Przycisk tytul="Przyznaj dostep" onPress={przyznaj} zajety={zajety} />
       </Sekcja>
 
       {/* ============ 2. MECHANICY I ICH TELEFONY ============ */}
@@ -305,7 +267,11 @@ export default function EkranAdministracji() {
                     <Text style={style.malyTekst}>Nowe haslo</Text>
                   </Pressable>
 
-                  {u.zablokowane_o ? (
+                  {/* Na wlasnym telefonie nie ma czego odcinac - administrator
+                      odcialby sam siebie od jedynego miejsca, z ktorego mozna
+                      komukolwiek przywrocic dostep. Serwer odmawia tego tak
+                      samo; tu po prostu nie pokazujemy pulapki. */}
+                  {m.to_ja ? null : u.zablokowane_o ? (
                     <Pressable
                       onPress={() => wykonaj((t) => akcjaNaUrzadzeniu(t, u.id, 'odblokuj'),
                         'Telefon odblokowany.')}
@@ -323,25 +289,24 @@ export default function EkranAdministracji() {
                     </Pressable>
                   )}
 
-                  <Pressable
-                    onPress={() => setPytanie({ rodzaj: 'wyrejestruj', urzadzenie: u, mechanik: m })}
-                    style={({ pressed }) => [style.maly, style.malyZly, pressed && style.wcisniety]}
-                  >
-                    <Text style={[style.malyTekst, style.malyTekstZly]}>Zgubiony</Text>
-                  </Pressable>
+                  {m.to_ja ? null : (
+                    <Pressable
+                      onPress={() => setPytanie({ rodzaj: 'wyrejestruj', urzadzenie: u, mechanik: m })}
+                      style={({ pressed }) => [style.maly, style.malyZly, pressed && style.wcisniety]}
+                    >
+                      <Text style={[style.malyTekst, style.malyTekstZly]}>Zgubiony</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             ))}
           </View>
         ))}
 
-        <Pole
-          etykieta="Nowy mechanik"
-          value={noweImie}
-          onChangeText={setNoweImie}
-          placeholder="Imie i nazwisko"
-        />
-        <Przycisk tytul="Zaloz konto" wariant="drugi" onPress={dodaj} zajety={zajety} />
+        <Text style={style.drobne}>
+          Kont nie zaklada sie tutaj recznie - powstaja same przy zatwierdzaniu
+          prosby o dostep.
+        </Text>
       </Sekcja>
 
       {zajety ? <ActivityIndicator color={Kolory.akcent} /> : null}
@@ -394,10 +359,6 @@ const style = StyleSheet.create({
   pusto: {
     fontSize: s(13), color: Kolory.tekstSlaby, fontStyle: 'italic', marginBottom: Odstepy.m,
   },
-  etykieta: {
-    fontSize: s(11), fontWeight: '800', letterSpacing: 0.6,
-    color: Kolory.tekstSlaby, marginBottom: Odstepy.s,
-  },
 
   sukces: {
     backgroundColor: Kolory.okTlo,
@@ -422,25 +383,19 @@ const style = StyleSheet.create({
     minHeight: CEL_DOTYKU,
   },
   wcisniety: { opacity: 0.7 },
-  kodTekst: {
-    fontSize: s(18), fontWeight: '900', letterSpacing: 2, color: Kolory.akcentCiemny,
-  },
   oczekujaceOpis: { flex: 1, minWidth: 0 },
-  oczekujaceNazwa: { fontSize: s(13), fontWeight: '700', color: Kolory.tekst },
-
-  wybor: { flexDirection: 'row', flexWrap: 'wrap', gap: Odstepy.s, marginBottom: Odstepy.m },
-  opcja: {
-    borderWidth: 1,
-    borderColor: Kolory.obramowanie,
-    backgroundColor: Kolory.powierzchnia,
+  oczekujaceImie: {
+    fontSize: s(16), fontWeight: '800', color: Kolory.tekst, marginBottom: 2,
+  },
+  zatwierdz: {
+    backgroundColor: Kolory.akcent,
     borderRadius: Zaokraglenia.pelne,
-    paddingHorizontal: Odstepy.m,
+    paddingHorizontal: Odstepy.l,
     justifyContent: 'center',
     minHeight: CEL_DOTYKU,
   },
-  opcjaAktywna: { backgroundColor: Kolory.akcent, borderColor: Kolory.akcent },
-  opcjaTekst: { fontSize: s(14), fontWeight: '700', color: Kolory.tekstDrugi },
-  opcjaTekstAktywny: { color: Kolory.tekstNaAkcencie },
+  zatwierdzNieaktywny: { opacity: 0.5 },
+  zatwierdzTekst: { fontSize: s(14), fontWeight: '800', color: Kolory.tekstNaAkcencie },
 
   karta: {
     backgroundColor: Kolory.powierzchnia,

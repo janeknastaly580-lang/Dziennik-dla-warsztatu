@@ -60,8 +60,6 @@ export default function KafelekKlienta({
           {klient.liczba_aut} {odmiana(klient.liczba_aut, 'auto', 'auta', 'aut')}
           {'  ·  '}
           {klient.liczba_wizyt} {odmiana(klient.liczba_wizyt, 'wizyta', 'wizyty', 'wizyt')}
-          {/* D5: zegarek przy kartotece, ktora czeka jeszcze na wyslanie. */}
-          {klient.oczekuje ? <Text style={style.czeka}>{'  ·  ⏱ czeka'}</Text> : null}
         </Text>
       </View>
 
@@ -110,7 +108,6 @@ const style = StyleSheet.create({
   nazwa: { fontSize: s(17), fontWeight: '700', color: Kolory.tekst },
   szczegoly: { fontSize: s(13), color: Kolory.tekstDrugi, marginTop: 2 },
   liczniki: { fontSize: s(12), color: Kolory.tekstSlaby, marginTop: 3 },
-  czeka: { color: Kolory.wTrakcie, fontWeight: '700' },
   znacznik: {
     minWidth: s(54),
     alignItems: 'center',

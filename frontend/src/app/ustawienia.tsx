@@ -1,12 +1,16 @@
 /**
  * Ekran "Aplikacja i synchronizacja".
  *
- * Nie ma tu juz adresu serwera do wpisywania - aplikacja laczy sie z chmura
- * warsztatu, a dostep przyznaje administrator. Zamiast tego mechanik widzi to,
- * co naprawde musi wiedziec:
+ * Nie ma tu adresu serwera do wpisywania - aplikacja laczy sie z chmura
+ * warsztatu, a dostep przyznaje administrator.
  *
- *  D4  kiedy ostatnio udalo sie polaczyc z serwerem (wiek danych),
- *  D5  ile zmian czeka jeszcze na wyslanie i jak dlugo czeka najstarsza,
+ * SYNCHRONIZACJA JEST NIEWIDOCZNA. Na ekranach roboczych nie ma po niej ani
+ * sladu: dziala sama, po kazdym zapisie i cyklicznie w tle. Jedyne jej
+ * miejsce w interfejsie to maly znacznik u gory TEGO ekranu - kropka
+ * z liczba pozycji, ktore czekaja jeszcze na wyslanie. Dotkniecie wysyla
+ * je natychmiast.
+ *
+ * Poza tym mechanik widzi tu:
  *  A4  po ilu dniach bez polaczenia telefon sam skasuje swoje dane,
  *  A10 informacje, ze wgladu w kartoteki sa zapisywane.
  *
@@ -14,7 +18,7 @@
  * nie ulatwia wyniesienia calej bazy klientow jak jeden przycisk.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Przycisk, Sekcja } from '../komponenty/Formularz';
@@ -26,11 +30,6 @@ import { useAplikacja } from '../dane/kontekst';
 import { WERSJA_APLIKACJI, WERSJA_SCHEMATU } from '../dane/konfiguracja';
 import { Kolory, Odstepy, Zaokraglenia } from '../motyw';
 import { s, wys } from '../uklad';
-
-function czasLokalny(iso: string | null): string {
-  if (!iso) return 'jeszcze nigdy';
-  return new Date(iso).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 export default function EkranUstawien() {
   const router = useRouter();
@@ -64,32 +63,23 @@ export default function EkranUstawien() {
 
   return (
     <ScrollView style={style.ekran} contentContainerStyle={style.tresc}>
-      <Sekcja tytul="SYNCHRONIZACJA">
-        <Wiersz etykieta="Ostatnie polaczenie" wartosc={czasLokalny(sync.ostatniaUdana)} />
-        <Wiersz
-          etykieta="Czeka na wyslanie"
-          wartosc={wKolejce === 0 ? 'nic - wszystko wyslane' : `${wKolejce} zmian`}
-          alarm={wKolejce > 0}
-        />
-        {sync.najstarszaCzeka ? (
-          <Wiersz
-            etykieta="Najstarsza zmiana z"
-            wartosc={czasLokalny(sync.najstarszaCzeka)}
-            alarm={Date.now() - new Date(sync.najstarszaCzeka).getTime() > 24 * 3600 * 1000}
-          />
-        ) : null}
-        {sync.blad ? <Wiersz etykieta="Ostatni komunikat" wartosc={sync.blad} alarm /> : null}
+      <ZnacznikSynchronizacji
+        wKolejce={wKolejce}
+        trwa={sync.trwa}
+        onDotkniecie={wymusSynchronizacje}
+      />
 
-        <Przycisk
-          tytul={sync.trwa ? 'Synchronizacja...' : 'Synchronizuj teraz'}
-          onPress={wymusSynchronizacje}
-          zajety={sync.trwa}
-        />
-        <Text style={style.podpowiedz}>
-          Wszystko, co wpiszesz, zapisuje sie najpierw na telefonie i nie ginie przy
-          braku zasiegu. Na serwer trafia w tle, gdy tylko pojawi sie internet.
-        </Text>
-      </Sekcja>
+      {/* B10: jedyny stan synchronizacji, ktory mechanik MUSI zobaczyc, bo
+          sam go nie naprawi - aplikacja jest za stara, zeby pobierac dane. */}
+      {sync.wymagaAktualizacji ? (
+        <View style={style.doAktualizacji}>
+          <Text style={style.doAktualizacjiTekst}>
+            Ta wersja aplikacji jest za stara, zeby pobierac nowe dane. Twoje zapisy
+            nadal ida na serwer i nic nie ginie, ale zglos to administratorowi -
+            trzeba zainstalowac nowsza wersje.
+          </Text>
+        </View>
+      ) : null}
 
       <Sekcja tytul="TO URZADZENIE">
         <Wiersz etykieta="Mechanik" wartosc={mechanik ?? '-'} />
@@ -128,8 +118,10 @@ export default function EkranUstawien() {
       <Sekcja tytul="BEZPIECZENSTWO">
         <View style={style.informacja}>
           <Text style={style.informacjaTekst}>
-            Aplikacja blokuje sie sama po 5 minutach bezczynnosci i za kazdym razem,
-            gdy przelaczysz sie na inna aplikacje.
+            Haslo podajesz raz - przy uruchomieniu aplikacji. Przelaczenie sie na
+            inna aplikacje ani odlozenie telefonu nie zamyka dostepu; blokada wraca
+            dopiero po zamknieciu i ponownym otwarciu aplikacji. Kiedy oddajesz
+            telefon komus na chwile, uzyj przycisku ponizej.
           </Text>
           <Text style={style.informacjaTekst}>
             Jesli telefon nie polaczy sie z serwerem przez {wygasniecie ?? '14'} dni,
@@ -176,6 +168,45 @@ export default function EkranUstawien() {
   );
 }
 
+/**
+ * Caly interfejs synchronizacji: kropka i liczba.
+ *
+ * Zero to zielony ptaszek, cokolwiek wiecej - pomaranczowa liczba pozycji,
+ * ktore czekaja na wyslanie. Nie ma tu slowa "synchronizacja", bo mechanika
+ * nie interesuje mechanizm, tylko to, czy cos jeszcze wisi. Dotkniecie
+ * probuje wyslac natychmiast (przydatne, gdy wlasnie wrocil zasieg).
+ */
+function ZnacznikSynchronizacji({ wKolejce, trwa, onDotkniecie }: {
+  wKolejce: number; trwa: boolean; onDotkniecie: () => void;
+}) {
+  const czysto = wKolejce === 0;
+  const kolor = czysto ? Kolory.ok : Kolory.wTrakcie;
+
+  return (
+    <View style={style.paskiem}>
+      <Pressable
+        onPress={onDotkniecie}
+        disabled={trwa}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={czysto
+          ? 'Wszystko wyslane na serwer'
+          : `${wKolejce} zmian czeka na wyslanie. Dotknij, zeby wyslac teraz.`}
+        style={({ pressed }) => [
+          style.znacznik,
+          { borderColor: kolor },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <View style={[style.znacznikKropka, { backgroundColor: kolor }]} />
+        <Text style={[style.znacznikTekst, { color: kolor }]}>
+          {trwa ? '···' : czysto ? '✓' : wKolejce}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function Wiersz({ etykieta, wartosc, alarm }: {
   etykieta: string; wartosc: string; alarm?: boolean;
 }) {
@@ -192,6 +223,28 @@ function Wiersz({ etykieta, wartosc, alarm }: {
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
   tresc: { padding: Odstepy.l, paddingBottom: wys(8, 32) },
+
+  paskiem: { alignItems: 'flex-end', marginBottom: Odstepy.s },
+  znacznik: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(5),
+    borderWidth: 1,
+    borderRadius: Zaokraglenia.pelne,
+    paddingHorizontal: s(8),
+    paddingVertical: s(3),
+  },
+  znacznikKropka: { width: s(6), height: s(6), borderRadius: 999 },
+  znacznikTekst: { fontSize: s(11), fontWeight: '800' },
+  doAktualizacji: {
+    backgroundColor: Kolory.pilneTlo,
+    borderWidth: 1,
+    borderColor: Kolory.pilneObramowanie,
+    borderRadius: Zaokraglenia.m,
+    padding: Odstepy.m,
+    marginBottom: Odstepy.m,
+  },
+  doAktualizacjiTekst: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.blad },
   wiersz: {
     flexDirection: 'row',
     justifyContent: 'space-between',

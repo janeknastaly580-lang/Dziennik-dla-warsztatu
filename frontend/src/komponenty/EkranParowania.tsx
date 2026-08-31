@@ -1,15 +1,18 @@
 /**
  * Ekran parowania - pierwsze wejscie mechanika do aplikacji.
  *
- * Mechanik nie zna i nie wpisuje zadnego hasla do systemu. Aplikacja pokazuje
- * osmioznakowy kod, mechanik podaje go administratorowi, a administrator
- * jednym klikniciem w panelu przydziela ten telefon konkretnemu czlowiekowi.
+ * Mechanik nie zna i nie wpisuje zadnego hasla do systemu. Podaje TYLKO
+ * swoje imie i nazwisko i prosi o dostep. Na liscie administratora pojawia
+ * sie gotowy wiersz - imie, nazwisko i kod tego telefonu - a administrator
+ * klika "Zatwierdz". Nie wpisuje ani jednego znaku i nie musi wiedziec,
+ * jak pisze sie czyjes nazwisko. Konto zaklada sie samo.
+ *
  * Telefon odbiera dostep w ciagu kilku sekund i dopiero wtedy prosi
  * o ustawienie WLASNEGO hasla do blokady aplikacji.
  *
- * Kod nie jest sekretem - sam z siebie nic nie daje. Dostep przyznaje
- * administrator, a token odbiera wylacznie ten telefon, ktory ma sekret
- * zapisany w Keychain / Keystore.
+ * Ani kod, ani imie nie sa sekretem - same z siebie nic nie daja. Dostep
+ * przyznaje administrator, a token odbiera wylacznie ten telefon, ktory ma
+ * sekret zapisany w Keychain / Keystore.
  *
  * D2 - To jedyny moment, w ktorym internet jest konieczny. Wdrazaj
  *      mechanikow przy dzialajacym laczu.
@@ -42,25 +45,41 @@ export default function EkranParowania() {
   const [odpytywanie, setOdpytywanie] = useState(false);
   const [kodZaproszenia, setKodZaproszenia] = useState('');
   const [pokazZaproszenie, setPokazZaproszenie] = useState(false);
+  const [imie, setImie] = useState('');
   const zywy = useRef(true);
 
   useEffect(() => () => { zywy.current = false; }, []);
 
   /* --------------------- odczyt zgloszenia z pamieci -------------------- */
   useEffect(() => {
-    pobierzZgloszenie().then((z) => { if (zywy.current) setZgloszenie(z); });
+    pobierzZgloszenie().then((z) => {
+      if (!zywy.current) return;
+      setZgloszenie(z);
+      if (z?.imie) setImie(z.imie);
+    });
   }, []);
 
   /* ------------------------------ zgloszenie ---------------------------- */
   const poprosOKod = useCallback(async () => {
+    const czysteImie = imie.trim().replace(/\s+/g, ' ');
+    if (czysteImie.length < 3) {
+      setBlad('Wpisz swoje imie i nazwisko - pod nim administrator zobaczy Twoja prosbe.');
+      return;
+    }
+
     setZajety(true);
     setBlad(null);
     try {
       const nazwa = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ')
         || `telefon ${Platform.OS}`;
-      const nowe = await zglosUrzadzenie({ platforma: Platform.OS, nazwa_urzadzenia: nazwa });
-      await zapiszZgloszenie(nowe);
-      if (zywy.current) setZgloszenie(nowe);
+      const nowe = await zglosUrzadzenie({
+        platforma: Platform.OS, nazwa_urzadzenia: nazwa, imie: czysteImie,
+      });
+      // Imie trzymamy takze u siebie - zeby po ponownym otwarciu aplikacji
+      // bylo widac, o kogo prosbe wyslano.
+      const zImieniem = { ...nowe, imie: czysteImie };
+      await zapiszZgloszenie(zImieniem);
+      if (zywy.current) setZgloszenie(zImieniem);
     } catch (err) {
       setBlad(err instanceof BladSieci
         ? 'Brak polaczenia z internetem. Pierwsze uruchomienie aplikacji wymaga sieci.'
@@ -68,6 +87,12 @@ export default function EkranParowania() {
     } finally {
       if (zywy.current) setZajety(false);
     }
+  }, [imie]);
+
+  /** Powrot do formularza: mechanik chce poprawic literowke w nazwisku. */
+  const zacznijOdNowa = useCallback(() => {
+    setZgloszenie(null);
+    setBlad(null);
   }, []);
 
   /* ------------------------ kod zaproszenia ----------------------------- */
@@ -82,7 +107,12 @@ export default function EkranParowania() {
       if (!biezace) {
         const nazwa = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ')
           || `telefon ${Platform.OS}`;
-        biezace = await zglosUrzadzenie({ platforma: Platform.OS, nazwa_urzadzenia: nazwa });
+        biezace = await zglosUrzadzenie({
+          platforma: Platform.OS,
+          nazwa_urzadzenia: nazwa,
+          // Przy kodzie zaproszenia imie i tak bierze sie z samego kodu.
+          imie: imie.trim(),
+        });
         await zapiszZgloszenie(biezace);
         if (zywy.current) setZgloszenie(biezace);
       }
@@ -105,7 +135,7 @@ export default function EkranParowania() {
     } finally {
       if (zywy.current) setZajety(false);
     }
-  }, [zgloszenie, kodZaproszenia]);
+  }, [zgloszenie, kodZaproszenia, imie]);
 
   /* -------------------- odpytywanie o zgode administratora -------------- */
   useEffect(() => {
@@ -158,8 +188,10 @@ export default function EkranParowania() {
         <View style={style.karta}>
           <Text style={style.tytul}>Aplikacja nie jest skonfigurowana</Text>
           <Text style={style.tresc}>
-            W pliku frontend/app.json brakuje adresu serwera albo klucza publicznego
-            (sekcja "extra"). Uzupelnij je i zbuduj aplikacje ponownie.
+            Brakuje adresu serwera albo klucza publicznego. Normalnie sa wpisane na
+            stale w frontend/app.config.js (stale DOMYSLNY_ADRES i DOMYSLNY_KLUCZ_*)
+            i nikt nie musi ich nigdzie wklejac. Jesli widzisz ten ekran, ktos je
+            nadpisal pustymi zmiennymi EXPO_PUBLIC_SUPABASE_* w frontend/.env.
           </Text>
         </View>
       </View>
@@ -185,16 +217,19 @@ export default function EkranParowania() {
       <View style={style.karta}>
         <Text style={style.tytul}>Dostep do aplikacji</Text>
         <Text style={style.tresc}>
-          Nie ma tu zadnego hasla do wpisania. Dostep przyznaje administrator
-          warsztatu - zdalnie, jeden raz. Potem ustawisz wlasne haslo.
+          Nie ma tu zadnego hasla do wpisania. Podaj swoje imie i nazwisko
+          i popros o dostep - administrator warsztatu zatwierdzi Twoj telefon
+          jednym klikniciem. Potem ustawisz wlasne haslo.
         </Text>
 
         {zgloszenie ? (
           <>
-            <Text style={style.etykieta}>PODAJ TEN KOD ADMINISTRATOROWI</Text>
-            <View style={style.kodRamka}>
-              <Text style={style.kod} selectable>{zgloszenie.kod}</Text>
-            </View>
+            {zgloszenie.imie ? (
+              <View style={style.podpis}>
+                <Text style={style.podpisEtykieta}>PROSBA WYSLANA JAKO</Text>
+                <Text style={style.podpisImie}>{zgloszenie.imie}</Text>
+              </View>
+            ) : null}
 
             <View style={style.oczekiwanie}>
               {odpytywanie ? <ActivityIndicator color={Kolory.akcent} /> : null}
@@ -204,19 +239,39 @@ export default function EkranParowania() {
             </View>
 
             <Text style={[style.tresc, style.drobne]}>
-              Kod jest wazny 24 godziny. Ekran mozna zamknac - po ponownym otwarciu
-              aplikacja wroci tutaj z tym samym kodem.
+              Administrator widzi juz Twoje imie i nazwisko na swojej liscie -
+              nie musisz mu niczego dyktowac. Ekran mozna zamknac; po ponownym
+              otwarciu aplikacja wroci tutaj. Prosba jest wazna 24 godziny.
             </Text>
 
-            <Pressable onPress={poprosOKod} hitSlop={8}>
-              <Text style={style.link}>Popros o nowy kod</Text>
+            {/* Kod schodzi na drugi plan: przydaje sie tylko wtedy, gdy
+                administrator ma przed soba kilka podobnych zgloszen. */}
+            <Text style={[style.tresc, style.drobne, style.bezMarginesu]}>
+              Numer tej prosby: <Text style={style.kodWTekscie} selectable>{zgloszenie.kod}</Text>
+            </Text>
+
+            <Pressable onPress={zacznijOdNowa} hitSlop={8}>
+              <Text style={style.link}>Poprawic imie i nazwisko?</Text>
             </Pressable>
           </>
         ) : (
           <>
+            <Pole
+              etykieta="Imie i nazwisko"
+              wymagane
+              value={imie}
+              onChangeText={setImie}
+              placeholder="np. Jan Kowalski"
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={120}
+              onSubmitEditing={poprosOKod}
+              returnKeyType="go"
+            />
             <Text style={[style.tresc, style.drobne]}>
-              Do pierwszego uruchomienia potrzebny jest internet. Pozniej aplikacja
-              dziala takze bez zasiegu.
+              Pod tym imieniem administrator zobaczy Twoja prosbe i pod nim
+              powstanie Twoje konto. Do pierwszego uruchomienia potrzebny jest
+              internet - pozniej aplikacja dziala takze bez zasiegu.
             </Text>
             <Przycisk tytul="Popros o dostep" onPress={poprosOKod} zajety={zajety} />
           </>
@@ -289,24 +344,24 @@ const style = StyleSheet.create({
   tytulOdciecia: { fontSize: s(19), fontWeight: '800', color: Kolory.pilne, marginBottom: Odstepy.s },
   tresc: { fontSize: s(14.5), lineHeight: s(21), color: Kolory.tekstDrugi, marginBottom: Odstepy.m },
   drobne: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.tekstSlaby },
-  etykieta: {
-    fontSize: s(11), fontWeight: '800', letterSpacing: 0.8,
-    color: Kolory.tekstSlaby, marginBottom: Odstepy.s,
-  },
-  kodRamka: {
+  podpis: {
     backgroundColor: Kolory.akcentTlo,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: Kolory.akcent,
     borderRadius: Zaokraglenia.l,
-    paddingVertical: Odstepy.l,
-    alignItems: 'center',
+    paddingVertical: Odstepy.m,
+    paddingHorizontal: Odstepy.m,
     marginBottom: Odstepy.m,
   },
-  kod: {
-    fontSize: s(32),
-    fontWeight: '900',
-    letterSpacing: s(6),
-    color: Kolory.akcentCiemny,
+  podpisEtykieta: {
+    fontSize: s(10.5), fontWeight: '800', letterSpacing: 0.8,
+    color: Kolory.akcentCiemny, marginBottom: 2,
+  },
+  podpisImie: { fontSize: s(19), fontWeight: '800', color: Kolory.akcentCiemny },
+  kodWTekscie: {
+    fontWeight: '800',
+    letterSpacing: s(1),
+    color: Kolory.tekstDrugi,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   oczekiwanie: { flexDirection: 'row', alignItems: 'center', gap: Odstepy.s, marginBottom: Odstepy.m },

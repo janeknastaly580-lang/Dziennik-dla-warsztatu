@@ -21,21 +21,49 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RamkaTelefonu from '../komponenty/RamkaTelefonu';
 import EkranParowania from '../komponenty/EkranParowania';
 import { EkranOdblokowania, EkranUstawieniaHasla } from '../komponenty/EkranBlokady';
-import { Ladowanie } from '../komponenty/Stany';
+import { KomunikatBledu, Ladowanie } from '../komponenty/Stany';
 import { AplikacjaProvider, useAplikacja } from '../dane/kontekst';
+import { TRYB_PODGLADU } from '../dane/pamiecBezpieczna';
 import { Kolory, Typografia } from '../motyw';
 
 function Bramka() {
-  const { faza, aktywnosc } = useAplikacja();
+  const { faza, bladBazy, sprobujPonownie } = useAplikacja();
 
-  if (faza === 'ladowanie') return <Ladowanie tekst="Otwieranie danych warsztatu..." />;
-  if (faza === 'parowanie') return <EkranParowania />;
-  if (faza === 'ustaw_haslo') return <EkranUstawieniaHasla />;
-  if (faza === 'zablokowana') return <EkranOdblokowania />;
+  if (faza === 'ladowanie') {
+    return (
+      <View style={style.pelny}>
+        <Ladowanie tekst="Otwieranie danych warsztatu..." />
+      </View>
+    );
+  }
+
+  // Baza sie nie otworzyla. Mowimy o tym wprost - kreciolek bez konca byl
+  // gorszy niz jakikolwiek komunikat.
+  if (faza === 'brak_bazy') {
+    return (
+      <View style={style.pelny}>
+        <KomunikatBledu
+          tytul="Nie udalo sie otworzyc danych"
+          tresc={bladBazy ?? 'Nie udalo sie otworzyc lokalnej bazy danych.'}
+          tekstPonow={TRYB_PODGLADU ? 'Odswiez strone' : 'Sprobuj ponownie'}
+          onPonow={sprobujPonownie}
+        />
+      </View>
+    );
+  }
+
+  if (faza === 'parowanie' || faza === 'ustaw_haslo' || faza === 'zablokowana') {
+    return (
+      <View style={style.pelny}>
+        {faza === 'parowanie' ? <EkranParowania /> : null}
+        {faza === 'ustaw_haslo' ? <EkranUstawieniaHasla /> : null}
+        {faza === 'zablokowana' ? <EkranOdblokowania /> : null}
+      </View>
+    );
+  }
 
   return (
-    // A5: kazde dotkniecie ekranu odsuwa moment samoczynnego zablokowania.
-    <View style={style.pelny} onTouchStart={aktywnosc} onStartShouldSetResponderCapture={() => false}>
+    <View style={style.pelny}>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: Kolory.powierzchnia },

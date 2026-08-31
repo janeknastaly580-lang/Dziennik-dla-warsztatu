@@ -84,7 +84,7 @@ sprawdzają token urządzenia.
 powershell -ExecutionPolicy Bypass -File supabase\testy\test-anon.ps1
 ```
 
-Wynik na dziś: wszystkie 12 tabel i 4 funkcje → HTTP 401/404. Ręcznie:
+Wynik na dziś: wszystkie 13 tabel i 8 funkcji → HTTP 401/404. Ręcznie:
 
 ```bash
 curl "https://tpigqlvwjatlkhfqtlkt.supabase.co/rest/v1/klienci?select=*" -H "apikey: <ANON>"
@@ -92,25 +92,50 @@ curl "https://tpigqlvwjatlkhfqtlkt.supabase.co/rest/v1/klienci?select=*" -H "api
 
 zwraca `{"code":"42501","message":"permission denied for schema public"}`.
 
-Security Advisor pokazuje 12 wpisów `rls_enabled_no_policy` na poziomie INFO —
+Security Advisor pokazuje 13 wpisów `rls_enabled_no_policy` na poziomie INFO —
 to **zamierzony** stan „deny‑by‑default”, nie usterka.
 
-### A2 — Klucz service_role w aplikacji lub repozytorium ✅ 👤
+### A2 — Klucz service_role w aplikacji lub repozytorium ✅
 
-- W aplikacji mobilnej jest **wyłącznie** klucz `anon`
-  ([frontend/src/dane/konfiguracja.ts](frontend/src/dane/konfiguracja.ts)).
-- `service_role` żyje w dwóch miejscach: w sekretach Edge Functions (po stronie
-  Supabase) i w `narzedzia/.env` na komputerze **dostawcy usługi** — nie
-  warsztatu. `.env` jest w `.gitignore`.
-- Skaner sekretów + hook `pre-commit`:
-  [narzedzia/scripts/skanuj-sekrety.js](narzedzia/scripts/skanuj-sekrety.js)
-  ```bash
-  cd narzedzia && npm run skanuj -- --hook
-  ```
-  Wykrywa JWT z rolą `service_role`, klucze `sb_secret_…`, hasła w URL-ach
-  Postgresa, klucze prywatne PEM, tokeny GitHub i AWS.
+Klucze są rozdzielone na dwa światy, a granicy pilnują **dwa niezależne
+bezpieczniki**, nie sama dyscyplina.
 
-👤 Zainstaluj hook i **zrotuj klucz**, jeśli kiedykolwiek gdzieś go wkleiłeś.
+| Miejsce | Zawartość | W repozytorium? |
+|---|---|---|
+| `frontend/.env` | `EXPO_PUBLIC_SUPABASE_URL`, `..._PUBLISHABLE_KEY`, `..._ANON_KEY` | **tak, celowo** |
+| `narzedzia/.env` | `SUPABASE_SERVICE_ROLE_KEY` | nie |
+| sekrety Supabase | `SUPABASE_SERVICE_ROLE_KEY` dla Edge Functions | n/d |
+
+Dlaczego klucz publiczny leży w repozytorium: Expo i tak wkleja każdą zmienną
+`EXPO_PUBLIC_*` na stałe do paczki `.apk`/`.ipa`, którą da się rozpakować
+w kilka minut. Ukrywanie takiej wartości niczego nie chroni, a jej brak
+w repozytorium psuje build w chmurze EAS. Bezpieczeństwo nie stoi tu na
+tajności klucza, tylko na tym, że klucz **nie otwiera niczego** (A1).
+
+**Bezpiecznik 1 — build.** `app.config.js` dekoduje każdy klucz z
+`frontend/.env` i **przerywa build**, jeśli znajdzie token z rolą inną niż
+`anon` albo klucz `sb_secret_...`. Sprawdzone na żywo: podstawiony JWT
+z `role: service_role` zatrzymuje `expo config` komunikatem
+„nie może trafić do aplikacji mobilnej… ZROTUJ go”.
+
+**Bezpiecznik 2 — commit.** [narzedzia/scripts/skanuj-sekrety.js](narzedzia/scripts/skanuj-sekrety.js)
+plus hook `pre-commit` (zainstalowany). Wykrywa JWT z rolą `service_role`,
+klucze `sb_secret_…`, hasła w URL-ach Postgresa, klucze prywatne PEM, tokeny
+GitHub i AWS. O tym, które pliki naprawdę trafią do repozytorium, pyta
+**samego gita** (`git check-ignore`) — nie powiela reguł z `.gitignore`,
+więc nie rozjedzie się z nimi.
+
+Osobna reguła łapie najgroźniejszą pomyłkę w tym projekcie: sekret pod
+prefiksem `EXPO_PUBLIC_`. Taki wpis jest zgłaszany jako poważny **nawet gdy
+plik jest w `.gitignore`**, bo i tak wylądowałby w paczce aplikacji.
+Sprawdzone: dopisanie `EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=sb_secret_…`
+do `frontend/.env` kończy skan kodem wyjścia 1 i blokuje commit.
+
+```bash
+cd narzedzia && npm run skanuj
+```
+
+👤 **Zrotuj klucz**, jeśli kiedykolwiek gdzieś go wkleiłeś.
 
 ### A3 — Zbyt szerokie reguły synchronizacji ✅
 
@@ -140,7 +165,8 @@ synchronizacji.
   Włączane opcją `useSQLCipher` wtyczki `expo-sqlite`
   ([frontend/app.json](frontend/app.json)); klucz i otwarcie bazy —
   [frontend/src/dane/baza.ts](frontend/src/dane/baza.ts).
-  ⚙️ Działa **wyłącznie we własnym buildzie**, nie w Expo Go.
+  ⚙️ Działa **wyłącznie we własnym buildzie**, nie w Expo Go i nie
+  w przeglądarce — patrz „Tryb podglądu" poniżej.
 - **Auto-wipe:** telefon, który nie połączył się z serwerem przez
   *wygaśnięcie offline* (domyślnie 14 dni, ustawiane per warsztat), kasuje całą
   lokalną bazę. Skradziony telefon nigdy się nie połączy, więc wyczyści się sam.
@@ -158,14 +184,38 @@ synchronizacji.
 👤 Systemowe szyfrowanie pamięci i ochrona Keystore działają **tylko wtedy, gdy
 telefon ma ustawiony PIN lub odcisk palca** — wymuś to na telefonach służbowych.
 
-### A5 — Aplikacja otwarta na niezablokowanym telefonie ✅
+**Tryb podglądu (przeglądarka).** Aplikację można uruchomić na `localhost`, żeby
+obejrzeć interfejs. W przeglądarce nie ma ani Keychain/Keystore, ani SQLCipher —
+token, hasło i baza leżą w zwykłym `localStorage`. Zamiast po cichu obniżać
+poziom zabezpieczeń, aplikacja przez cały czas wyświetla pomarańczowy pasek
+„TRYB PODGLĄDU — brak szyfrowania danych". Jedyne miejsce, które wie o istnieniu
+obu światów, to
+[frontend/src/dane/pamiecBezpieczna.ts](frontend/src/dane/pamiecBezpieczna.ts).
+👤 Do warsztatu idzie wyłącznie APK — nigdy adres webowy.
+
+### A5 — Aplikacja otwarta na niezablokowanym telefonie ⚠️ *(świadomie osłabione)*
 
 Własna blokada aplikacji, niezależna od blokady systemowej:
 
 - hasło (dowolne — mechanik wymyśla je sam) albo odcisk palca / Face ID,
-- **automatyczne zablokowanie po 5 minutach bezczynności**,
-- **natychmiastowe zablokowanie przy przejściu aplikacji w tło**,
-- przycisk „Zablokuj aplikację teraz”.
+- **hasło przy każdym uruchomieniu aplikacji** — sesja żyje w pamięci procesu,
+  więc ubicie aplikacji przez system, restart telefonu, a w przeglądarce
+  zamknięcie karty oznaczają ponowne pytanie o hasło,
+- przycisk „Zablokuj aplikację teraz” — do ręki, gdy oddajesz komuś telefon.
+
+**Czego tu NIE MA, a było wcześniej** (decyzja warsztatu, 31.08.2026):
+automatycznego zablokowania po 5 minutach bezczynności i zablokowania przy
+przejściu aplikacji w tło. Mechanik wpisywał hasło kilkanaście razy dziennie —
+za każdym razem, gdy odebrał telefon albo sprawdził SMS — i zaczynał ustawiać
+hasła jednoznakowe, co dawało zabezpieczenie gorsze niż jego brak.
+
+**Co to zmienia w praktyce:** telefon **odblokowany i pozostawiony bez opieki**
+pokazuje dane klientów, dopóki aplikacja żyje. Obroną jest teraz blokada
+ekranu samego telefonu (PIN / odcisk palca) — patrz punkt 5 w
+[DO-ZROBIENIA-RECZNIE.md](DO-ZROBIENIA-RECZNIE.md), który z „dobrej praktyki”
+staje się przez to **wymogiem**. Nienaruszone zostają: szyfrowanie bazy (A4),
+zdalne odcięcie telefonu (A6) i samoczynne czyszczenie po długim braku
+kontaktu z serwerem.
 
 [frontend/src/dane/kontekst.tsx](frontend/src/dane/kontekst.tsx),
 [frontend/src/komponenty/EkranBlokady.tsx](frontend/src/komponenty/EkranBlokady.tsx).

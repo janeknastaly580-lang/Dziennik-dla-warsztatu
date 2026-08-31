@@ -3,9 +3,8 @@
  *
  * Administrator to mechanik z rola "administrator". Ponad zwyklego mechanika
  * moze DOKLADNIE tyle:
- *   1. przyznac dostep telefonowi - zdalnie, jednorazowym kodem z jego ekranu,
- *      bez podawania jakiegokolwiek hasla (telefon sam poprosi mechanika
- *      o ustawienie wlasnego hasla),
+ *   1. zatwierdzic telefon czekajacy na dostep - jednym klikiem, bez wpisywania
+ *      czegokolwiek (telefon sam poprosi mechanika o ustawienie wlasnego hasla),
  *   2. odebrac dostep mechanikowi albo pojedynczemu telefonowi.
  * Nie widzi wiecej danych klientow niz ktokolwiek inny.
  *
@@ -102,6 +101,17 @@ Deno.serve(async (req: Request) => {
         return odpowiedz(200, await wywolaj("admin_dodaj_mechanika", {
           p_wykonawca: wykonawca, p_imie: imie,
           p_rola: cialo.rola === "administrator" ? "administrator" : "mechanik",
+        }));
+      }
+
+      /* Jeden klik: kod wiersza, ktory administrator dotknal. Konto mechanika
+         powstaje po stronie bazy, z imienia podanego przez samego mechanika. */
+      case "zatwierdz": {
+        const kod = tekst(cialo.kod, 8)?.toUpperCase();
+        if (!kod) return odpowiedz(200, { ok: false, blad: "Nie wskazano telefonu" });
+        log("zatwierdzenie_urzadzenia");
+        return odpowiedz(200, await wywolaj("admin_zatwierdz_urzadzenie", {
+          p_wykonawca: wykonawca, p_kod: kod,
         }));
       }
 

@@ -78,12 +78,25 @@ function ustawStan(zmiany: Partial<StanSynchronizacji>) {
   for (const f of sluchacze) f(stan);
 }
 
-/** Odswieza liczniki kolejki - wolane po kazdym zapisie z ekranow (D5). */
+/**
+ * Odswieza liczniki kolejki - wolane po kazdym zapisie z ekranow (D5) -
+ * i OD RAZU probuje wyslac to, co wlasnie doszlo.
+ *
+ * Synchronizacja nie ma juz zadnego przycisku na ekranach roboczych, wiec
+ * nikt jej recznie nie uruchomi. Musi wiec ruszac sama, natychmiast po
+ * zapisie: przy dzialajacym internecie zmiana jest na serwerze, zanim
+ * mechanik zdazy wrocic do listy. Bez sieci nic sie nie dzieje - pozycja
+ * zostaje w kolejce, a nastepny cykl sprobuje ponownie (B8, D1).
+ *
+ * Wysylki nie czekamy: ekran ma sie odswiezyc od razu, a nie po podrozy
+ * do serwera i z powrotem.
+ */
 export async function odswiezLicznikiKolejki(): Promise<void> {
   ustawStan({
     wKolejce: await liczbaWKolejce(),
     najstarszaCzeka: await najstarszaPozycja(),
   });
+  void synchronizuj().catch(() => undefined);
 }
 
 export async function wczytajStanZBazy(): Promise<void> {

@@ -21,22 +21,64 @@ type PoleProps = TextInputProps & {
   wymagane?: boolean;
 };
 
-export function Pole({ etykieta, wymagane, style: styl, ...reszta }: PoleProps) {
+/**
+ * Oko "pokaz haslo" narysowane samymi widokami.
+ *
+ * Swiadomie bez biblioteki ikon: caly projekt nie ma ani jednej, a dokladanie
+ * kilku megabajtow fontow do paczki .apk dla jednego znaczka byloby zla
+ * wymiana. Ksztalt jest ten sam na Androidzie, iOS i w przegladarce.
+ */
+function IkonaOka({ przekreslone }: { przekreslone: boolean }) {
+  return (
+    <View style={style.oko}>
+      <View style={style.okoRamka}>
+        <View style={style.okoZrenica} />
+      </View>
+      {przekreslone ? <View style={style.okoPrzekreslenie} /> : null}
+    </View>
+  );
+}
+
+export function Pole({
+  etykieta, wymagane, style: styl, secureTextEntry, ...reszta
+}: PoleProps) {
+  // Kazde pole hasla dostaje podglad. Wpisywanie w ciemno tego samego hasla
+  // dwa razy to najczestszy powod "nie moge sie zalogowac".
+  const [pokazHaslo, setPokazHaslo] = React.useState(false);
+  const zHaslem = !!secureTextEntry;
+
   return (
     <View style={style.pole}>
       <Text style={style.etykieta}>
         {etykieta}
         {wymagane ? <Text style={style.gwiazdka}> *</Text> : null}
       </Text>
-      <TextInput
-        placeholderTextColor={Kolory.tekstSlaby}
-        {...reszta}
-        style={[
-          style.wejscie,
-          reszta.multiline && style.wejscieWielolinijkowe,
-          styl,
-        ]}
-      />
+
+      <View style={zHaslem ? style.opakowanieHasla : undefined}>
+        <TextInput
+          placeholderTextColor={Kolory.tekstSlaby}
+          secureTextEntry={zHaslem && !pokazHaslo}
+          {...reszta}
+          style={[
+            style.wejscie,
+            reszta.multiline && style.wejscieWielolinijkowe,
+            zHaslem && style.wejscieZHaslem,
+            styl,
+          ]}
+        />
+
+        {zHaslem ? (
+          <Pressable
+            onPress={() => setPokazHaslo((w) => !w)}
+            accessibilityRole="button"
+            accessibilityLabel={pokazHaslo ? 'Ukryj haslo' : 'Pokaz haslo'}
+            hitSlop={8}
+            style={({ pressed }) => [style.przelacznikHasla, pressed && { opacity: 0.6 }]}
+          >
+            <IkonaOka przekreslone={!pokazHaslo} />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -172,6 +214,44 @@ const style = StyleSheet.create({
     minHeight: s(96),
     textAlignVertical: 'top',
     paddingTop: Odstepy.m,
+  },
+
+  /* --------------------------- pole hasla ----------------------------- */
+  opakowanieHasla: { justifyContent: 'center' },
+  // Miejsce po prawej na oko - tekst hasla nie moze pod nie wjechac.
+  wejscieZHaslem: { paddingRight: s(48) },
+  przelacznikHasla: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: s(46),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  oko: { width: s(24), height: s(24), alignItems: 'center', justifyContent: 'center' },
+  okoRamka: {
+    width: s(22),
+    height: s(13),
+    borderWidth: s(1.7),
+    borderColor: Kolory.tekstSlaby,
+    borderRadius: s(11),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  okoZrenica: {
+    width: s(6),
+    height: s(6),
+    borderRadius: s(3),
+    backgroundColor: Kolory.tekstSlaby,
+  },
+  okoPrzekreslenie: {
+    position: 'absolute',
+    width: s(26),
+    height: s(1.7),
+    borderRadius: s(1),
+    backgroundColor: Kolory.tekstSlaby,
+    transform: [{ rotate: '-45deg' }],
   },
   opcje: { flexDirection: 'row', flexWrap: 'wrap', gap: Odstepy.s },
   opcja: {

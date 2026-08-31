@@ -22,7 +22,6 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 
 import { Przycisk } from '../../komponenty/Formularz';
 import Potwierdzenie from '../../komponenty/Potwierdzenie';
-import PasekSynchronizacji from '../../komponenty/PasekSynchronizacji';
 import { KomunikatBledu, Ladowanie } from '../../komponenty/Stany';
 import {
   pobierzWizyte, usunWizyte, zapiszWDzienniku, zmienStatusWizyty,
@@ -135,17 +134,6 @@ export default function EkranWizyty() {
       >
         <Stack.Screen options={{ title: numer ? `Zgloszenie ${numer}` : 'Zgloszenie' }} />
 
-        <PasekSynchronizacji />
-
-        {/* D5: przy tym konkretnym rekordzie widac, czy juz dotarl na serwer. */}
-        {wizyta.oczekuje ? (
-          <View style={style.czeka}>
-            <Text style={style.czekaTekst}>
-              {'⏱'} Zmiany w tym zgloszeniu czekaja na wyslanie. Sa bezpiecznie
-              zapisane na telefonie i pojda na serwer, gdy tylko wroci internet.
-            </Text>
-          </View>
-        ) : null}
 
         {/* Naglowek w kolorze statusu */}
         <View
@@ -257,15 +245,6 @@ const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
   przewijanie: { flex: 1 },
   tresc: { padding: Odstepy.l, paddingBottom: wys(7, 32), gap: Odstepy.m },
-
-  czeka: {
-    backgroundColor: Kolory.wTrakcieTlo,
-    borderWidth: 1,
-    borderColor: Kolory.wTrakcieObramowanie,
-    borderRadius: Zaokraglenia.m,
-    padding: Odstepy.m,
-  },
-  czekaTekst: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.wTrakcie },
 
   naglowek: {
     borderRadius: Zaokraglenia.l,
