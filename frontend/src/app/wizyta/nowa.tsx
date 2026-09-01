@@ -17,11 +17,10 @@
  *      usterki. Offline nic tego nie wykryje za nas.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import EkranFormularza from '../../komponenty/EkranFormularza';
 import {
   KomunikatFormularza, Pole, Przycisk, Sekcja, WyborOpcji,
 } from '../../komponenty/Formularz';
@@ -29,7 +28,7 @@ import { otwartaWizytaTegoAuta, utworzWizyte } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { formatujDate } from '../../format';
 import { Kolory, Odstepy, Zaokraglenia } from '../../motyw';
-import { s, wys } from '../../uklad';
+import { s } from '../../uklad';
 import type { Priorytet, Wizyta } from '../../typy';
 
 const PRIORYTETY: { wartosc: Priorytet; etykieta: string; kolor?: string }[] = [
@@ -83,11 +82,7 @@ export default function EkranNowaWizyta() {
   }, [idKlienta, auto, tytul, opis, priorytet, router]);
 
   return (
-    <KeyboardAvoidingView
-      style={style.ekran}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={style.tresc} keyboardShouldPersistTaps="handled">
+    <EkranFormularza>
         <KomunikatFormularza tresc={blad} />
 
         {podobna ? (
@@ -159,14 +154,11 @@ export default function EkranNowaWizyta() {
             wylaczony={zapisywanie}
           />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </EkranFormularza>
   );
 }
 
 const style = StyleSheet.create({
-  ekran: { flex: 1, backgroundColor: Kolory.tlo },
-  tresc: { padding: Odstepy.l, paddingBottom: wys(8, 32) },
   poleAuta: { minHeight: s(76) },
   podpowiedz: {
     fontSize: s(12), color: Kolory.tekstSlaby, lineHeight: s(17), marginTop: -Odstepy.xs,

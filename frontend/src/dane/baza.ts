@@ -139,6 +139,14 @@ const MIGRACJE: string[] = [
   CREATE INDEX IF NOT EXISTS idx_klienci_nazwa ON klienci (nazwa);
   CREATE INDEX IF NOT EXISTS idx_kolejka_kolej ON kolejka (id);
   `,
+
+  // wersja 2 - karencja usuwania wizyt (30 dni od oznaczenia "naprawione").
+  // B10: zmiana wylacznie addytywna, kolumna nullable bez wartosci wymaganej,
+  // wiec starsza wersja aplikacji dalej dziala na tej samej bazie.
+  `
+  ALTER TABLE wizyty ADD COLUMN naprawione_o TEXT;
+  CREATE INDEX IF NOT EXISTS idx_wizyty_naprawione ON wizyty (naprawione_o);
+  `,
 ];
 
 /**

@@ -10,6 +10,7 @@ import * as Crypto from 'expo-crypto';
 
 import { baza, pobierzMeta, ustawMeta } from './baza';
 import { dodajDoKolejki } from './kolejka';
+import { KARENCJA_USUWANIA_DNI } from './konfiguracja';
 import type {
   Auto, Klient, KlientNaLiscie, Priorytet, Status, Wizyta,
 } from '../typy';
@@ -357,6 +358,53 @@ export async function zaktualizujWizyte(
 
 export function zmienStatusWizyty(id: string, status: Status) {
   return zaktualizujWizyte(id, { status });
+}
+
+/* ====================================================================== */
+/*  KARENCJA USUWANIA                                                     */
+/*                                                                        */
+/*  Wizyte wolno usunac dopiero po 30 dniach od oznaczenia jej jako        */
+/*  naprawiona. Historia napraw bywa dowodem przy reklamacji, a skasowanie */
+/*  jej jest nieodwracalne - karencja daje czas na refleksje.              */
+/*                                                                        */
+/*  Ta funkcja sluzy WYLACZNIE do tego, zeby schowac przycisk i wyjasnic   */
+/*  mechanikowi dlaczego. Decyduje baza (`mozna_usunac_wizyte`), wiec      */
+/*  podmieniony zapis i tak sie odbije. Liczymy lokalnie, bo ekran musi    */
+/*  dzialac bez zasiegu.                                                  */
+/* ====================================================================== */
+
+export type OcenaUsuwania =
+  | { mozna: true }
+  | { mozna: false; powod: string; wolnoOd?: Date };
+
+export function ocenUsuwanieWizyty(
+  wizyta: Pick<Wizyta, 'status' | 'naprawione_o'>,
+  karencjaDni: number = KARENCJA_USUWANIA_DNI,
+): OcenaUsuwania {
+  if (wizyta.status !== 'naprawione') {
+    return {
+      mozna: false,
+      powod: 'Usunac mozna wylacznie zgloszenie oznaczone jako naprawione. '
+        + 'Pomylke popraw edycja albo zamknij zgloszenie.',
+    };
+  }
+
+  // Brak znacznika przy naprawionej wizycie zdarza sie tylko tuz po zmianie
+  // statusu, zanim serwer odesle swoja wersje. Liczymy wtedy od teraz -
+  // ostroznie, czyli na korzysc zachowania danych.
+  const naprawioneO = wizyta.naprawione_o ? new Date(wizyta.naprawione_o) : new Date();
+  const wolnoOd = new Date(naprawioneO.getTime() + karencjaDni * 86_400_000);
+
+  if (Date.now() < wolnoOd.getTime()) {
+    const zostalo = Math.max(1, Math.ceil((wolnoOd.getTime() - Date.now()) / 86_400_000));
+    return {
+      mozna: false,
+      wolnoOd,
+      powod: `Zgloszenie mozna usunac dopiero ${karencjaDni} dni po oznaczeniu jako `
+        + `naprawione. Pozostalo ${zostalo} ${zostalo === 1 ? 'dzien' : 'dni'}.`,
+    };
+  }
+  return { mozna: true };
 }
 
 export async function usunWizyte(id: string): Promise<void> {

@@ -32,7 +32,7 @@ import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { useAplikacja } from '../../dane/kontekst';
 import { formatujKwote } from '../../format';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../../motyw';
-import { s, wys } from '../../uklad';
+import { CEL_DOTYKU, s, wys } from '../../uklad';
 import type { Klient, KlientNaLiscie, Wizyta } from '../../typy';
 
 export default function EkranProfiluKlienta() {
@@ -176,6 +176,18 @@ export default function EkranProfiluKlienta() {
         </View>
 
         {klient.notatki ? <Text style={style.notatki}>{klient.notatki}</Text> : null}
+
+        {/* Edycja kartoteki. Celowo dyskretna - dominowac ma "DODAJ" wyzej,
+            bo dopisywanie zgloszen to codziennosc, a poprawianie danych
+            kontaktowych zdarza sie raz na jakis czas. */}
+        <Pressable
+          onPress={() => router.push(`/klient/edytuj?id=${klient.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel="Edytuj dane klienta"
+          style={({ pressed }) => [style.edytuj, pressed && style.edytujWcisniety]}
+        >
+          <Text style={style.edytujTekst}>Edytuj dane klienta</Text>
+        </Pressable>
 
         <View style={style.statystyki}>
           <Statystyka
@@ -339,6 +351,21 @@ const style = StyleSheet.create({
   notatki: {
     fontSize: s(13.5), color: Kolory.tekstDrugi, fontStyle: 'italic', marginTop: Odstepy.s,
   },
+  edytuj: {
+    alignSelf: 'flex-start',
+    marginTop: Odstepy.m,
+    paddingVertical: s(8),
+    paddingHorizontal: Odstepy.m,
+    borderRadius: Zaokraglenia.pelne,
+    borderWidth: 1,
+    borderColor: Kolory.obramowanie,
+    backgroundColor: Kolory.powierzchniaStonowana,
+    minHeight: CEL_DOTYKU,
+    justifyContent: 'center',
+  },
+  edytujWcisniety: { backgroundColor: Kolory.akcentTlo, borderColor: Kolory.akcent },
+  edytujTekst: { fontSize: s(13.5), fontWeight: '700', color: Kolory.akcent },
+
   statystyki: {
     flexDirection: 'row', marginTop: Odstepy.l,
     borderTopWidth: 1, borderTopColor: Kolory.obramowanie, paddingTop: Odstepy.m,

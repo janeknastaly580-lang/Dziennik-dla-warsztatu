@@ -60,6 +60,27 @@ export const DOMYSLNE_WYGASNIECIE_OFFLINE_DNI = 14;
 /** A3: zapasowe okno historii, dopoki serwer nie poda swojego. */
 export const DOMYSLNE_OKNO_DNI = 90;
 
+/**
+ * Ile dni po oznaczeniu zgloszenia jako naprawione wolno je usunac.
+ *
+ * Aplikacja uzywa tej liczby tylko po to, zeby SCHOWAC przycisk i wyjasnic
+ * mechanikowi dlaczego. Prawda jest po stronie bazy (kolumna
+ * `warsztaty.karencja_usuwania_dni` i funkcja `mozna_usunac_wizyte`), wiec
+ * nawet podmieniony zapis z telefonu odbije sie od serwera.
+ */
+export const KARENCJA_USUWANIA_DNI = 30;
+
+/**
+ * D7 - ponawianie po powrocie sieci.
+ *
+ * Gdy w kolejce cos czeka, probujemy czesciej niz zwykly cykl w tle, ale
+ * z rosnaca przerwa: 5 s, 10 s, 20 s, 40 s... do 5 minut. Dzieki temu
+ * krotka przerwa w zasiegu konczy sie dogonieniem serwera w kilka sekund,
+ * a dluga awaria nie mieli baterii ani lacza.
+ */
+export const PONOWIENIE_MIN_MS = 5_000;
+export const PONOWIENIE_MAKS_MS = 5 * 60 * 1000;
+
 export function czyChmuraSkonfigurowana(): boolean {
   return ADRES_CHMURY.startsWith('http') && KLUCZ_PUBLICZNY.length > 20;
 }

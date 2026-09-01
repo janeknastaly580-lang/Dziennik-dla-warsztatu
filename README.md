@@ -158,6 +158,18 @@ mechanik zapisuje → lokalna baza (natychmiast, offline)
 **90 dni plus wszystkie nadal otwarte**. Nie pięć lat historii — to ogranicza
 i pierwszą synchronizację, i szkodę z zgubionego telefonu.
 
+**Po przerwie w sieci telefon dogania serwer sam.** Działają dwa niezależne
+mechanizmy, bo żaden z osobna nie wystarcza:
+
+- **nasłuch stanu sieci** (`expo-network`) — reaguje w ułamku sekundy, gdy
+  Wi-Fi albo dane wracają; bywa jednak zawodny (potrafi zgłosić „połączony"
+  przy martwym łączu),
+- **ponawianie z rosnącą przerwą** — 5 s, 10 s, 20 s… do 5 minut, chodzi
+  **zawsze**, gdy w kolejce coś czeka, niezależnie od tego, co mówi system.
+
+Nasłuch jest przyspieszaczem, nie fundamentem. Gdyby zawiódł, kolejka i tak
+się opróżni — najwyżej minutę później.
+
 Trzy reguły, które chronią przed cichą utratą pracy:
 
 - **Kolejka nigdy nie stoi za jedną pozycją.** Pozycja znika z kolejki dopiero,
@@ -419,6 +431,35 @@ plus wybór priorytetu:
 
 Statusu **nie wybiera się przy dodawaniu** — każde nowe zgłoszenie startuje
 jako `nienaprawione` i idzie ścieżką `nienaprawione → w_trakcie → naprawione`.
+
+### Edycja i usuwanie
+
+Zgłoszenie i kartotekę klienta można poprawić — przyciskiem „Edytuj" na ekranie
+szczegółów. Przed zapisem pojawia się **pytanie z listą zmian** (`było → jest`),
+więc widać czarno na białym, co się zmieni. Do kolejki idą wyłącznie kolumny,
+które faktycznie się zmieniły, więc poprawka opisu nie cofnie statusu
+ustawionego w tym czasie przez kolegę.
+
+**Zgłoszenie można usunąć dopiero 30 dni po oznaczeniu go jako naprawione.**
+Wcześniej przycisk się nie pojawia — zamiast niego jest wyjaśnienie, ile dni
+zostało. Historia napraw bywa dowodem przy reklamacji, a skasowanie jej jest
+nieodwracalne.
+
+Konsekwencja przyjęta świadomie: **zgłoszenia otwartego nie da się usunąć
+wcale**. Pomyłkę poprawia się edycją albo zamknięciem, nie kasowaniem.
+
+Regułę egzekwuje baza (`mozna_usunac_wizyte`), nie tylko interfejs. Gdyby
+odmowa przyszła już po wyjściu z ekranu, aplikacja przywraca zgłoszenie
+lokalnie i pokazuje powód paskiem na górze — żeby nie wyglądało to na
+samoczynne cofnięcie się usunięcia.
+
+### Klawiatura
+
+Wszystkie formularze siedzą w `KeyboardAwareScrollView`
+(`react-native-keyboard-controller`): przy otwarciu klawiatury treść przesuwa
+się w górę, aktywne pole samo wjeżdża nad klawiaturę, a ekran **pozostaje
+normalnie przewijalny palcem**. Na Androidzie wymaga to
+`softwareKeyboardLayoutMode: "resize"` — jest ustawione w `app.json`.
 
 Jeśli to samo auto ma już otwartą wizytę z ostatnich 48 godzin, formularz
 o tym mówi **zanim** powstanie drugie zgłoszenie tej samej usterki.

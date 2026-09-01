@@ -30,9 +30,11 @@ import {
 } from './kolejka';
 import { pobierzToken, wyczyscWszystko } from './sesja';
 import { posprzatajPozaOknem } from './repozytorium';
+import * as Network from 'expo-network';
+
 import {
   DOMYSLNE_OKNO_DNI, DOMYSLNE_WYGASNIECIE_OFFLINE_DNI, MIN_PRZERWA_SYNC_MS,
-  WIERSZY_NA_STRONE, ZMIAN_NA_PACZKE,
+  PONOWIENIE_MAKS_MS, PONOWIENIE_MIN_MS, WIERSZY_NA_STRONE, ZMIAN_NA_PACZKE,
 } from './konfiguracja';
 
 export type StanSynchronizacji = {
@@ -50,6 +52,11 @@ export type StanSynchronizacji = {
   resetHasla: boolean;
   /** B10 - aplikacja jest za stara, zeby pobierac dane. */
   wymagaAktualizacji: boolean;
+  /**
+   * Serwer swiadomie odmowil wykonania operacji (np. proba usuniecia wizyty
+   * przed uplywem karencji). To NIE jest awaria - mechanik ma zobaczyc powod.
+   */
+  odmowa: string | null;
 };
 
 let stan: StanSynchronizacji = {
@@ -61,6 +68,7 @@ let stan: StanSynchronizacji = {
   odciecie: null,
   resetHasla: false,
   wymagaAktualizacji: false,
+  odmowa: null,
 };
 
 const sluchacze = new Set<(s: StanSynchronizacji) => void>();
@@ -144,7 +152,7 @@ const KOLUMNY_KLIENTA = ['nazwa', 'telefon', 'email', 'adres', 'nip', 'notatki',
   'zrobione_o', 'zapisane_o', 'usuniete_o'] as const;
 const KOLUMNY_WIZYTY = ['klient_id', 'auto', 'tytul', 'opis', 'status', 'priorytet',
   'data_wizyty', 'data_zamkniecia', 'przebieg', 'koszt', 'numer_roboczy',
-  'numer_oficjalny', 'zrobione_o', 'zapisane_o', 'usuniete_o'] as const;
+  'numer_oficjalny', 'naprawione_o', 'zrobione_o', 'zapisane_o', 'usuniete_o'] as const;
 
 /**
  * Wiersze z serwera nadpisuja lokalne - Z JEDNYM WYJATKIEM: rekordy, ktore
@@ -212,6 +220,8 @@ async function wyslijKolejke(token: string): Promise<WynikWysylki> {
     }
 
     const przyjete: number[] = [];
+    const wedlugId = new Map(pozycje.map((p) => [String(p.id), p]));
+
     for (const wynik of odpowiedz.wyniki ?? []) {
       przyjete.push(Number(wynik.id_lokalne));
       if (wynik.status === 'kwarantanna') kwarantanna += 1;
@@ -221,6 +231,24 @@ async function wyslijKolejke(token: string): Promise<WynikWysylki> {
       if (wynik.numer_oficjalny && wynik.id) {
         await db.runAsync('UPDATE wizyty SET numer_oficjalny = ? WHERE id = ?',
           wynik.numer_oficjalny, wynik.id);
+      }
+
+      /* --------------------------------------------------------------
+       * ODMOWA - serwer wykonal swoja robote i powiedzial "nie wolno"
+       * (np. karencja usuwania wizyty). Lokalnie rekord jest juz
+       * oznaczony jako usuniety, wiec musimy go COFNAC, inaczej mechanik
+       * widzialby zniknieta wizyte az do nastepnego pelnego pobrania.
+       * -------------------------------------------------------------- */
+      if (wynik.status === 'odmowa') {
+        const pozycja = wedlugId.get(String(wynik.id_lokalne));
+        if (pozycja && pozycja.operacja === 'usun'
+            && (pozycja.tabela === 'wizyty' || pozycja.tabela === 'klienci')) {
+          await db.runAsync(
+            `UPDATE ${pozycja.tabela} SET usuniete_o = NULL WHERE id = ?`,
+            pozycja.rekord_id,
+          );
+        }
+        ustawStan({ odmowa: wynik.blad ?? wynik.powod ?? 'Serwer nie pozwolil na te zmiane.' });
       }
     }
     await usunZKolejki(przyjete);
@@ -313,17 +341,21 @@ export async function synchronizuj(
     const okno = Number(await pobierzMeta('okno_dni')) || DOMYSLNE_OKNO_DNI;
     await posprzatajPozaOknem(okno);
 
+    const zostalo = await liczbaWKolejce();
     ustawStan({
       trwa: false,
       ostatniaUdana: czas,
       blad: wysylka.przerwane ? 'Czesc zmian czeka na lepszy zasieg.' : null,
-      wKolejce: await liczbaWKolejce(),
+      wKolejce: zostalo,
       najstarszaCzeka: await najstarszaPozycja(),
     });
+    // Kolejka pusta gasi ponawianie; niepusta - podkreca je z powrotem.
+    ustawRytmPonowien(zostalo > 0, !wysylka.przerwane);
   } catch (err) {
     if (err instanceof BladDostepu) {
       // A6: administrator odebral dostep albo kazal wyczyscic urzadzenie.
       await wyczyscWszystko();
+      anulujPonowienie();
       ustawStan({
         trwa: false,
         odciecie: { kod: err.kod, powod: err.powod },
@@ -333,12 +365,15 @@ export async function synchronizuj(
       return stan;
     }
     // D1: kazdy inny blad to blad przejsciowy. Nic nie kasujemy.
+    const zostalo = await liczbaWKolejce();
     ustawStan({
       trwa: false,
       blad: err instanceof Error ? err.message : 'Nie udalo sie polaczyc z serwerem.',
-      wKolejce: await liczbaWKolejce(),
+      wKolejce: zostalo,
       najstarszaCzeka: await najstarszaPozycja(),
     });
+    // Nie udalo sie - probujemy dalej, coraz rzadziej, az do skutku.
+    ustawRytmPonowien(zostalo > 0, false);
   }
 
   return stan;
@@ -350,4 +385,98 @@ export function potwierdzOdciecie(): void {
 
 export function potwierdzResetHasla(): void {
   ustawStan({ resetHasla: false });
+}
+
+/** Mechanik przeczytal komunikat o odmowie - gasimy go. */
+export function potwierdzOdmowe(): void {
+  ustawStan({ odmowa: null });
+}
+
+/* ====================================================================== */
+/*  D7 / D9 - DOGANIANIE SERWERA PO PRZERWIE W SIECI                      */
+/*                                                                        */
+/*  Dwa niezalezne mechanizmy, bo zaden z osobna nie wystarcza:            */
+/*                                                                        */
+/*   1. Nasluch stanu sieci - reaguje w ulamku sekundy, gdy Wi-Fi albo    */
+/*      dane wracaja. Jest jednak ZAWODNY: `expo-network` potrafi zglosic  */
+/*      "polaczony" przy martwym laczu (hotspot bez internetu, sieciowka   */
+/*      hotelowa przed zalogowaniem) albo w ogole nie odpalic zdarzenia.   */
+/*                                                                        */
+/*   2. Ponawianie z rosnaca przerwa - chodzi ZAWSZE, gdy w kolejce cos    */
+/*      czeka, niezaleznie od tego, co mowi system: 5 s, 10 s, 20 s...     */
+/*      do 5 minut. To ono jest gwarancja, ze dane w koncu dojda.          */
+/*                                                                        */
+/*  Nasluch jest przyspieszaczem, nie fundamentem. Gdyby zawiodl, kolejka  */
+/*  i tak sie oprozni - najwyzej minute pozniej.                          */
+/* ====================================================================== */
+
+let czasomierzPonowienia: ReturnType<typeof setTimeout> | null = null;
+let przerwaPonowienia = PONOWIENIE_MIN_MS;
+
+function anulujPonowienie() {
+  if (czasomierzPonowienia) clearTimeout(czasomierzPonowienia);
+  czasomierzPonowienia = null;
+}
+
+/** Planuje kolejna probe, jesli w kolejce cos zostalo. */
+function zaplanujPonowienie() {
+  anulujPonowienie();
+  czasomierzPonowienia = setTimeout(() => {
+    czasomierzPonowienia = null;
+    void synchronizuj({ wymuszona: true }).catch(() => undefined);
+  }, przerwaPonowienia);
+}
+
+/** Po kazdym cyklu: pusta kolejka gasi ponawianie, niepusta je podkreca. */
+function ustawRytmPonowien(cosZostalo: boolean, udaloSie: boolean) {
+  if (!cosZostalo) {
+    anulujPonowienie();
+    przerwaPonowienia = PONOWIENIE_MIN_MS;
+    return;
+  }
+  // Udany cykl, ale kolejka niepusta (np. duza paczka) - probujemy zaraz.
+  // Nieudany - odsuwamy sie dwukrotnie, do gornego limitu.
+  przerwaPonowienia = udaloSie
+    ? PONOWIENIE_MIN_MS
+    : Math.min(przerwaPonowienia * 2, PONOWIENIE_MAKS_MS);
+  zaplanujPonowienie();
+}
+
+/**
+ * Wlacza nasluch stanu sieci. Zwraca funkcje, ktora go wylacza.
+ * Bezpieczne na kazdej platformie - w przegladarce `expo-network` nie ma
+ * nasluchu i po prostu go tam nie ma, a ponawianie z punktu 2 dziala dalej.
+ */
+export function uruchomWznawianiePoSieci(): () => void {
+  let bylBezSieci = false;
+
+  const reaguj = (polaczony: boolean) => {
+    if (polaczony && bylBezSieci) {
+      // Siec wrocila - nie czekamy na kolejny tik, ruszamy natychmiast.
+      przerwaPonowienia = PONOWIENIE_MIN_MS;
+      void synchronizuj({ wymuszona: true }).catch(() => undefined);
+    }
+    bylBezSieci = !polaczony;
+  };
+
+  // Stan poczatkowy, zeby pierwszy powrot sieci zostal rozpoznany.
+  Network.getNetworkStateAsync()
+    .then((s) => { bylBezSieci = !s.isConnected; })
+    .catch(() => { bylBezSieci = false; });
+
+  try {
+    const subskrypcja = Network.addNetworkStateListener((s) => {
+      reaguj(!!s.isConnected);
+    });
+    return () => {
+      try {
+        subskrypcja.remove();
+      } catch {
+        // Wylaczenie nasluchu nie moze wysadzic odmontowania ekranu.
+      }
+    };
+  } catch {
+    // Platforma bez nasluchu (przegladarka) - zostaje ponawianie z backoffem.
+    return () => undefined;
+  }
 }

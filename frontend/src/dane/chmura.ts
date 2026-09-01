@@ -187,11 +187,18 @@ export type ZmianaDoWyslania = {
 
 export type WynikZmiany = {
   id_lokalne: string;
-  status: 'ok' | 'kwarantanna' | 'scalone';
+  /**
+   * `odmowa` to swiadoma decyzja serwera (np. karencja usuwania wizyty),
+   * a nie awaria. Rozni sie tym od `kwarantanna`, gdzie zapisu nie dalo sie
+   * zastosowac z powodu, ktorego nikt nie przewidzial.
+   */
+  status: 'ok' | 'kwarantanna' | 'scalone' | 'odmowa';
   id?: string;
   numer_oficjalny?: string;
   mozliwy_duplikat?: string;
   blad?: string;
+  powod?: string;
+  wolno_od?: string;
 };
 
 export function wyslijZmiany(token: string, zmiany: ZmianaDoWyslania[]) {

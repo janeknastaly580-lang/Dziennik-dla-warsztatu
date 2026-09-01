@@ -73,6 +73,8 @@ export type Wizyta = {
   priorytet: Priorytet;
   data_wizyty: string;
   data_zamkniecia: string | null;
+  /** Moment oznaczenia jako naprawione - od niego liczy sie karencja usuwania. */
+  naprawione_o: string | null;
   przebieg: number | null;
   koszt: number | null;
   /** B5: numer nadany na telefonie (widoczny od razu). */

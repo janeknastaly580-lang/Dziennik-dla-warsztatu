@@ -24,7 +24,7 @@ import { Przycisk } from '../../komponenty/Formularz';
 import Potwierdzenie from '../../komponenty/Potwierdzenie';
 import { KomunikatBledu, Ladowanie } from '../../komponenty/Stany';
 import {
-  pobierzWizyte, usunWizyte, zapiszWDzienniku, zmienStatusWizyty,
+  ocenUsuwanieWizyty, pobierzWizyte, usunWizyte, zapiszWDzienniku, zmienStatusWizyty,
 } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { useAplikacja } from '../../dane/kontekst';
@@ -117,6 +117,9 @@ export default function EkranWizyty() {
 
   const opis = opisStatusu(wizyta.status);
   const numer = wizyta.numer_oficjalny ?? wizyta.numer_roboczy ?? '';
+  // Karencja usuwania - liczona lokalnie, zeby ekran dzialal bez zasiegu.
+  // Ostateczne zdanie ma baza (`mozna_usunac_wizyte`).
+  const ocena = ocenUsuwanieWizyty(wizyta);
 
   return (
     <View style={style.ekran}>
@@ -207,10 +210,29 @@ export default function EkranWizyty() {
         </View>
 
         <Przycisk
-          tytul="Usun zgloszenie"
-          wariant="niebezpieczny"
-          onPress={() => setPytanieOUsuniecie(true)}
+          tytul="Edytuj zgloszenie"
+          wariant="drugi"
+          onPress={() => router.push(`/wizyta/edytuj?id=${wizyta.id}`)}
         />
+
+        {/* Usuwanie dopiero 30 dni po oznaczeniu jako naprawione. Zamiast
+            wyszarzonego przycisku bez wyjasnienia - powod napisany wprost. */}
+        {ocena.mozna ? (
+          <Przycisk
+            tytul="Usun zgloszenie"
+            wariant="niebezpieczny"
+            onPress={() => setPytanieOUsuniecie(true)}
+          />
+        ) : (
+          <View style={style.karencja}>
+            <Text style={style.karencjaTytul}>Tego zgloszenia nie mozna teraz usunac</Text>
+            <Text style={style.karencjaTekst}>{ocena.powod}</Text>
+            <Text style={style.karencjaTekst}>
+              Historia napraw bywa dowodem przy reklamacji, a skasowanie jej jest
+              nieodwracalne. Jesli cos jest nie tak z trescia - popraw ja edycja.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {pytanieOUsuniecie ? (
@@ -304,6 +326,17 @@ const style = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Kolory.obramowanie,
   },
+  karencja: {
+    backgroundColor: Kolory.powierzchniaStonowana,
+    borderWidth: 1,
+    borderColor: Kolory.obramowanie,
+    borderRadius: Zaokraglenia.m,
+    padding: Odstepy.m,
+    gap: Odstepy.s,
+  },
+  karencjaTytul: { fontSize: s(13.5), fontWeight: '800', color: Kolory.tekstDrugi },
+  karencjaTekst: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.tekstSlaby },
+
   wierszEtykieta: { fontSize: s(13), color: Kolory.tekstSlaby },
   wierszWartosc: {
     fontSize: s(14), fontWeight: '600', color: Kolory.tekst, flex: 1, textAlign: 'right',

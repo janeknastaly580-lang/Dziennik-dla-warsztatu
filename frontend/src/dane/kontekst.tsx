@@ -28,8 +28,9 @@ import {
 } from './sesja';
 import { TRYB_PODGLADU } from './pamiecBezpieczna';
 import {
-  StanSynchronizacji, obserwujSynchronizacje, potwierdzOdciecie, potwierdzResetHasla,
-  sprawdzWygasniecieOffline, stanSynchronizacji, synchronizuj, wczytajStanZBazy,
+  StanSynchronizacji, obserwujSynchronizacje, potwierdzOdciecie, potwierdzOdmowe,
+  potwierdzResetHasla, sprawdzWygasniecieOffline, stanSynchronizacji, synchronizuj,
+  uruchomWznawianiePoSieci, wczytajStanZBazy,
 } from './synchronizacja';
 import { OKRES_SYNC_MS } from './konfiguracja';
 
@@ -60,6 +61,7 @@ type Kontekst = {
   sprobujPonownie: () => void;
   potwierdzOdciecie: () => void;
   potwierdzResetHasla: () => void;
+  potwierdzOdmowe: () => void;
   synchronizuj: (opcje?: { wymuszona?: boolean }) => Promise<unknown>;
 };
 
@@ -160,6 +162,13 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
   /* --------------------------- stan synchronizacji ---------------------- */
   useEffect(() => obserwujSynchronizacje(setSync), []);
 
+  /* ------------- D9: dogonienie serwera po przerwie w sieci -------------- */
+  // Nasluch stanu sieci chodzi przez CALE zycie aplikacji, nie tylko gdy
+  // ekran jest odblokowany. Zmiany zapisane tuz przed utrata zasiegu maja
+  // dojsc do serwera, gdy tylko wroci - bez czekania na to, az mechanik
+  // otworzy telefon.
+  useEffect(() => uruchomWznawianiePoSieci(), []);
+
   // Rola moze sie zmienic po stronie serwera (administrator kogos awansowal
   // albo odebral uprawnienia) - odczytujemy ja po kazdej synchronizacji.
   useEffect(() => {
@@ -211,8 +220,10 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
 
   /* ------------- wrocil internet: rusz od razu, nie czekaj na cykl ------- */
   useEffect(() => {
-    // Zdarzenie `online` istnieje tylko w przegladarce; na telefonie te role
-    // pelni powrot aplikacji z tla (wyzej) i cykliczny licznik.
+    // Zdarzenie `online` istnieje tylko w przegladarce. Na telefonie te sama
+    // robote wykonuje `uruchomWznawianiePoSieci()` wyzej - nasluch stanu sieci
+    // z expo-network plus ponawianie z rosnaca przerwa. Tu zostaje wersja
+    // webowa, zeby podglad na localhost tez dogonil serwer po przerwie.
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
       return undefined;
     }
@@ -247,7 +258,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
     faza, bladBazy, mechanik, warsztat, sync,
     rola, czyAdministrator: rola === 'administrator',
     odswiezFaze, odblokowano, zablokuj, wyloguj, sprobujPonownie,
-    potwierdzOdciecie, potwierdzResetHasla, synchronizuj,
+    potwierdzOdciecie, potwierdzResetHasla, potwierdzOdmowe, synchronizuj,
   }), [faza, bladBazy, mechanik, warsztat, sync, rola,
        odswiezFaze, odblokowano, zablokuj, wyloguj, sprobujPonownie]);
 

@@ -10,16 +10,15 @@
  * w tle - formularz nie czeka na siec (D1).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import EkranFormularza from '../../komponenty/EkranFormularza';
 import { KomunikatFormularza, Pole, Przycisk, Sekcja } from '../../komponenty/Formularz';
 import { klienciZTymSamymTelefonem, utworzKlienta } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { Kolory, Odstepy, Zaokraglenia } from '../../motyw';
-import { s, wys } from '../../uklad';
+import { s } from '../../uklad';
 import type { KlientNaLiscie } from '../../typy';
 
 export default function EkranNowyKlient() {
@@ -63,11 +62,7 @@ export default function EkranNowyKlient() {
   }, [nazwa, telefon, email, adres, nip, notatki, router]);
 
   return (
-    <KeyboardAvoidingView
-      style={style.ekran}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={style.tresc} keyboardShouldPersistTaps="handled">
+    <EkranFormularza>
         <KomunikatFormularza tresc={blad} />
 
         {podobni.length ? (
@@ -136,14 +131,11 @@ export default function EkranNowyKlient() {
             wylaczony={zapisywanie}
           />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </EkranFormularza>
   );
 }
 
 const style = StyleSheet.create({
-  ekran: { flex: 1, backgroundColor: Kolory.tlo },
-  tresc: { padding: Odstepy.l, paddingBottom: wys(8, 32) },
   podpowiedz: {
     fontSize: s(12.5), color: Kolory.tekstSlaby, lineHeight: s(17), marginBottom: Odstepy.m,
   },

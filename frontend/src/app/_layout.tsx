@@ -13,10 +13,11 @@
  *     przelaczy mechanika na ekran logowania.
  */
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import RamkaTelefonu from '../komponenty/RamkaTelefonu';
 import EkranParowania from '../komponenty/EkranParowania';
@@ -24,7 +25,30 @@ import { EkranOdblokowania, EkranUstawieniaHasla } from '../komponenty/EkranBlok
 import { KomunikatBledu, Ladowanie } from '../komponenty/Stany';
 import { AplikacjaProvider, useAplikacja } from '../dane/kontekst';
 import { TRYB_PODGLADU } from '../dane/pamiecBezpieczna';
-import { Kolory, Typografia } from '../motyw';
+import { Kolory, Odstepy, Typografia, Zaokraglenia } from '../motyw';
+import { s } from '../uklad';
+
+/**
+ * Serwer swiadomie odmowil wykonania zmiany - dzis jedyny taki przypadek to
+ * proba usuniecia zgloszenia przed uplywem 30-dniowej karencji.
+ *
+ * Aplikacja pokazuje to jako pasek nad cala nawigacja, bo odmowa przychodzi
+ * z opoznieniem (po synchronizacji), gdy mechanik jest juz zwykle na innym
+ * ekranie. Wizyta zostala w miedzyczasie przywrocona w lokalnej bazie, wiec
+ * bez tego komunikatu mechanik zobaczylby tylko, ze "usuniecie samo sie
+ * cofnelo" - i slusznie uznalby to za blad aplikacji.
+ */
+function PasekOdmowy() {
+  const { sync, potwierdzOdmowe } = useAplikacja();
+  if (!sync.odmowa) return null;
+
+  return (
+    <Pressable onPress={potwierdzOdmowe} style={style.odmowa}>
+      <Text style={style.odmowaTekst}>{sync.odmowa}</Text>
+      <Text style={style.odmowaStopka}>Dotknij, aby ukryc</Text>
+    </Pressable>
+  );
+}
 
 function Bramka() {
   const { faza, bladBazy, sprobujPonownie } = useAplikacja();
@@ -64,6 +88,7 @@ function Bramka() {
 
   return (
     <View style={style.pelny}>
+      <PasekOdmowy />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: Kolory.powierzchnia },
@@ -88,6 +113,14 @@ function Bramka() {
           options={{ title: 'Nowy klient', presentation: 'modal' }}
         />
         <Stack.Screen
+          name="klient/edytuj"
+          options={{ title: 'Edycja klienta', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="wizyta/edytuj"
+          options={{ title: 'Edycja zgloszenia', presentation: 'modal' }}
+        />
+        <Stack.Screen
           name="wizyta/nowa"
           options={{ title: 'Nowa wizyta / usterka', presentation: 'modal' }}
         />
@@ -103,17 +136,34 @@ function Bramka() {
 export default function UkladGlowny() {
   return (
     <SafeAreaProvider>
-      <AplikacjaProvider>
+      {/* KeyboardProvider musi stac nad cala nawigacja - to on mierzy
+          wysokosc klawiatury dla KeyboardAwareScrollView w formularzach. */}
+      <KeyboardProvider>
+        <AplikacjaProvider>
         <StatusBar style="dark" />
         {/* Cala aplikacja siedzi w ramce telefonu o proporcjach 9:16. */}
         <RamkaTelefonu>
           <Bramka />
         </RamkaTelefonu>
-      </AplikacjaProvider>
+        </AplikacjaProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
 
 const style = StyleSheet.create({
   pelny: { flex: 1 },
+  odmowa: {
+    backgroundColor: Kolory.pilneTlo,
+    borderBottomWidth: 1,
+    borderBottomColor: Kolory.pilneObramowanie,
+    borderRadius: Zaokraglenia.s,
+    paddingHorizontal: Odstepy.m,
+    paddingVertical: Odstepy.s,
+  },
+  odmowaTekst: { fontSize: s(12.5), lineHeight: s(18), color: Kolory.blad },
+  odmowaStopka: {
+    fontSize: s(11), fontWeight: '700', color: Kolory.blad,
+    marginTop: 2, opacity: 0.75,
+  },
 });
