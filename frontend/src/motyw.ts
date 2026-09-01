@@ -6,10 +6,8 @@
  * przez kafelki historii wizyt.
  *
  * Wszystkie odstepy i czcionki przechodza przez skale z `uklad.ts`, wiec
- * proporcje interfejsu sa te same na kazdym telefonie o ukladzie ~9:16.
+ * proporcje interfejsu sa te same w kazdym oknie o ukladzie ~9:16.
  */
-import { Platform } from 'react-native';
-
 import { s } from './uklad';
 
 export const Kolory = {
@@ -47,10 +45,9 @@ export const Kolory = {
   blad: '#B91C1C',
   bladTlo: '#FEF2F2',
 
-  /* Oprawa ramki telefonu - widoczna tylko na szerokich ekranach
-     (tablet, przegladarka). Nie nalezy do palety samej aplikacji. */
+  /* Tlo wokol kolumny tresci - widoczne dopiero po rozciagnieciu okna.
+     Nie nalezy do palety samej aplikacji. */
   tloOprawy: '#E7EBF1',
-  obudowa: '#12161C',
 } as const;
 
 /** Odstepy pionowe i poziome - skalowane do wielkosci ekranu. */
@@ -83,9 +80,6 @@ export const Typografia = {
 /** Cien dla kart - mocniejszy dla elementow, ktore maja przyciagac wzrok. */
 export function cien(poziom: 'brak' | 'lekki' | 'mocny' = 'lekki') {
   if (poziom === 'brak') return {};
-  if (Platform.OS === 'android') {
-    return { elevation: poziom === 'mocny' ? 6 : 2 };
-  }
   return poziom === 'mocny'
     ? {
         shadowColor: '#0F172A',

@@ -6,6 +6,13 @@ Stan repozytorium: gałąź `main`, commit `0a0c0ac`, drzewo czyste
 > **Ten dokument jest wyłącznie diagnozą.** Nic w projekcie nie zostało zmienione —
 > jedyny nowy plik to ten raport. Wszystkie zapytania do Supabase były odczytowe.
 
+> **Uwaga po fakcie:** audyt powstał, gdy aplikacja była programem na telefony
+> (Android/iOS, klucze w Keychain/Keystore). Projekt przeszedł potem na
+> **program Windows** — klucze trzyma DPAPI, bazę otwiera proces główny
+> (`windows/glowny.js`). Ustalenia dotyczące logiki (K1–K4, W1–W2, R1…) zostały
+> spisane tak, jak brzmiały wtedy; nazwy mechanizmów systemowych czytaj przez
+> tę zmianę. Aktualny stan opisuje [BEZPIECZENSTWO.md](BEZPIECZENSTWO.md).
+
 ---
 
 ## 0. Podsumowanie w trzech zdaniach
@@ -15,7 +22,7 @@ kolumnowy UPDATE, trwała kolejka, idempotencja. Problemy nie leżą w projekcie
 tylko w **kilku miejscach, gdzie zabezpieczenie jest opisane, ale nie działa** —
 i to jest gorsze niż jego brak, bo nikt go już nie sprawdzi. Trzy rzeczy trzeba
 naprawić, zanim system dotknie prawdziwego warsztatu: **kopia zapasowa w ogóle
-się nie wykonuje**, **auto-wipe zgubionego telefonu jest wyłączany przez zwykłą
+się nie wykonuje**, **auto-wipe zgubionego komputera jest wyłączany przez zwykłą
 niewysłaną zmianę**, a **lista „prośby o dostęp" jest wspólna dla wszystkich
 warsztatów**.
 
@@ -50,7 +57,7 @@ Dane produkcyjne dziś: 1 warsztat, 3 mechaników, 5 urządzeń, 3 klientów, 9 
 
 ## 1. 🔴 KRYTYCZNE
 
-### K1 — Lista „prośby o dostęp" jest globalna; administrator może zatwierdzić cudzy telefon
+### K1 — Lista „prośby o dostęp" jest globalna; administrator może zatwierdzić cudzy komputer
 
 **Gdzie:** `supabase/migracje/0012_zatwierdzanie_jednym_klikiem.sql:166-181`
 (`dane_administracyjne`, sekcja `oczekujace`) oraz `:203-216`
@@ -71,10 +78,10 @@ Powód jest zrozumiały (przed zatwierdzeniem urządzenie nie ma jeszcze
 
 1. **Wyciek danych osobowych między warsztatami.** Administrator warsztatu B
    widzi na swojej liście imiona i nazwiska ludzi, którzy właśnie proszą
-   o dostęp w warsztacie A — razem z nazwą i platformą ich telefonu. To dane
+   o dostęp w warsztacie A — razem z nazwą i platformą ich komputera. To dane
    osobowe wydane podmiotowi, który nie jest ich administratorem.
-2. **Przejęcie telefonu.** Kto pierwszy kliknie „Zatwierdź", ten dostaje
-   telefon do swojego warsztatu. Mechanik z warsztatu A ustawia hasło, wchodzi
+2. **Przejęcie komputera.** Kto pierwszy kliknie „Zatwierdź", ten dostaje
+   komputer do swojego warsztatu. Mechanik z warsztatu A ustawia hasło, wchodzi
    i widzi kartoteki warsztatu B — a jego własne zapisy lądują w bazie B.
    Ekran parowania nie pokazuje nawet, do jakiego warsztatu został przypisany.
 
@@ -91,7 +98,7 @@ listę. Najmniej inwazyjnie:
    autoryzuje. `parowanie/zglos` rozwiązuje prefiks na `warsztat_zgloszony`.
 3. `dane_administracyjne` → `where u.warsztat_zgloszony = v_warsztat`.
 4. `admin_zatwierdz_urzadzenie` → dodatkowy warunek
-   `and u.warsztat_zgloszony = v_warsztat`, inaczej „Ten telefon nie zgłaszał
+   `and u.warsztat_zgloszony = v_warsztat`, inaczej „Ten komputer nie zgłaszał
    się do Twojego warsztatu".
 5. Ekran parowania po odebraniu tokenu pokazuje **nazwę warsztatu**, żeby
    mechanik zobaczył, gdzie trafił.
@@ -154,7 +161,7 @@ przetestowane, bo nie ma czego odtwarzać.
 
 ---
 
-### K3 — Auto-wipe zgubionego telefonu (A4) jest wyłączany przez jedną niewysłaną zmianę
+### K3 — Auto-wipe zgubionego komputera (A4) jest wyłączany przez jedną niewysłaną zmianę
 
 **Gdzie:** `frontend/src/dane/synchronizacja.ts:333-338`
 
@@ -175,9 +182,9 @@ Konsekwencje:
 
 - **`sprawdzWygasniecieOffline()` (`:120-146`) nigdy nie zadziała.** Porównuje
   `ostatnia_udana_sync` z granicą 14 dni, a wartość odświeża się co 45 sekund
-  w samolocie, w bunkrze i w kieszeni złodzieja. Skradziony telefon z jedną
+  w samolocie, w bunkrze i w kieszeni złodzieja. Skradziony komputer z jedną
   niewysłaną zmianą w kolejce **nie wyczyści się sam nigdy** — a to jedno
-  z dwóch zabezpieczeń, na których stoi cała historia „zgubiony telefon czyści
+  z dwóch zabezpieczeń, na których stoi cała historia „zgubiony komputer czyści
   się sam".
 - Wiek danych pokazywany użytkownikowi (gdyby kiedyś wrócił — patrz R2) byłby
   fałszywy.
@@ -238,7 +245,7 @@ z pustą bazą i bez tokenu — zamiast wrócić na ekran parowania.
 1. `czytaj()` nie może zrównywać błędu z brakiem. Zwracać
    `{ stan: 'jest' | 'brak' | 'blad', wartosc }` albo rzucać dedykowany wyjątek.
 2. `sprawdzHaslo()`: przy błędzie odczytu → `{ ok: false, blad: 'awaria' }`
-   i komunikat „nie można odczytać zabezpieczeń tego telefonu", nigdy `ok:true`.
+   i komunikat „nie można odczytać zabezpieczeń tego komputera", nigdy `ok:true`.
 3. Przy realnym braku weryfikatora, ale obecnym tokenie → faza `ustaw_haslo`
    (już istnieje), nie „wchodź".
 4. Po `{ wyczyszczono: true }` w `EkranBlokady.tsx:~200` wywołać `odswiezFaze()`,
@@ -288,7 +295,7 @@ czyli praca, która nie zdążyła dojechać do serwera. Bez jednego komunikatu.
 
 ---
 
-### W2 — Wyścig przy wydawaniu tokenu może dać telefonowi token, którego serwer nie zna
+### W2 — Wyścig przy wydawaniu tokenu może dać komputerowi token, którego serwer nie zna
 
 **Gdzie:** `supabase/funkcje/parowanie/index.ts:222-240`
 
@@ -309,7 +316,7 @@ czeka** na poprzednią odpowiedź — `EkranParowania.tsx:177-180`) drugie żąd
 robi UPDATE bez efektu, widzi hash pierwszego i zwraca 200 razem z własnym,
 nigdzie niezapisanym tokenem.
 
-**Skutek dla mechanika:** telefon zapisuje martwy token, pierwszy `sync` dostaje
+**Skutek dla mechanika:** komputer zapisuje martwy token, pierwszy `sync` dostaje
 401 `NIEZNANY_TOKEN`, aplikacja traktuje to jako `BladDostepu` → `wyczyscWszystko()`
 → ekran „Dostęp został odebrany" **tuż po udanym sparowaniu**. Objaw jest
 mylący: wygląda jak złośliwość administratora.
@@ -322,7 +329,7 @@ const { data: zaktualizowane } = await db.from("urzadzenia")
 if (!zaktualizowane?.length) return odpowiedz(409, { kod: "TOKEN_JUZ_WYDANY" });
 ```
 
-Po stronie telefonu: nie odpalać kolejnego `sprawdz`, dopóki poprzedni nie
+Po stronie komputera: nie odpalać kolejnego `sprawdz`, dopóki poprzedni nie
 wrócił (flaga `wTrakcie` w `EkranParowania.tsx`).
 
 ---
@@ -336,13 +343,13 @@ const klucz = `${sesja.urzadzenie_id}:${idLokalne || crypto.randomUUID()}`;
 ```
 
 `idLokalne` to `kolejka.id` — `INTEGER PRIMARY KEY AUTOINCREMENT` z lokalnej
-bazy telefonu.
+bazy komputera.
 
 **Co jest nie tak.** Jeśli lokalna baza zostanie odtworzona od zera (scenariusz
 W1 — plik skasowany, token w Keystore **zostaje**), numeracja kolejki startuje
 od 1. Klucze `<to samo urzadzenie>:1`, `:2`, `:3` już są w tabeli `operacje`
 (czyszczona dopiero po 30 dniach). Serwer zwróci zapamiętany wynik z dopiskiem
-`powtorka: true`, telefon uzna pozycję za przyjętą i usunie ją z kolejki —
+`powtorka: true`, komputer uzna pozycję za przyjętą i usunie ją z kolejki —
 a **do bazy nic nie trafi**.
 
 Dziś: 110 wpisów w `operacje`, 0 kolizji — bo scenariusz jeszcze nie wystąpił.
@@ -362,7 +369,7 @@ woła), `README.md` („zajrzyj do tabeli `kwarantanna` w panelu Supabase").
 
 **Co jest nie tak.** Model B8 jest zrealizowany poprawnie: serwer nigdy nie
 odrzuca zapisu trwałym błędem, tylko odkłada go do kwarantanny i potwierdza
-przyjęcie. Ale **potwierdzenie przyjęcia jest dla telefonu nieodróżnialne od
+przyjęcie. Ale **potwierdzenie przyjęcia jest dla komputera nieodróżnialne od
 sukcesu**: kropka w Ustawieniach pokazuje `✓`, licznik spada do zera, mechanik
 widzi „wszystko wysłane". Zapis leży w tabeli, do której nikt nie zagląda.
 
@@ -373,7 +380,7 @@ Zmienna `kwarantanna` w `WynikWysylki` jest zliczana i nigdzie nie używana.
 1. Dodać do `StanSynchronizacji` pole `wKwarantannie` i pokazać je na ekranie
    ⚙ obok kropki („N zapisów serwer odłożył do sprawdzenia").
 2. Na ekranie „Dostęp" sekcja dla administratora oparta o `raport_synchronizacji()`
-   — telefony milczące >24 h i liczba wpisów w kwarantannie. Funkcja już
+   — komputery milczące >24 h i liczba wpisów w kwarantannie. Funkcja już
    istnieje, wystarczy ją wystawić przez funkcję brzegową `admin`.
 3. Docelowo: powiadomienie do dostawcy (webhook / cron sprawdzający
    `count(*) from kwarantanna where rozwiazane_o is null`).
@@ -396,7 +403,7 @@ end if;                                  -- ← RETURN zatwierdza transakcję
 
 **Co jest nie tak.** `RETURN` w PL/pgSQL nie wycofuje niczego. Przy nieudanym
 UPDATE (urządzenie już sparowane) w bazie zostaje pusty warsztat z zajętym
-prefiksem i konto administratora bez telefonu, a **kod zaproszenia nadal jest
+prefiksem i konto administratora bez komputera, a **kod zaproszenia nadal jest
 nieużyty** — więc powtórzenie próby tworzy kolejną parę śmieci. Ma to też
 skutek dla K1: każdy taki duch to kolejny „warsztat" w systemie.
 
@@ -407,17 +414,17 @@ z `0010_administrator_w_aplikacji.sql:105-120`.
 
 ---
 
-### W6 — Rekordy skasowane w chmurze żyją na telefonie bez końca
+### W6 — Rekordy skasowane w chmurze żyją na komputerze bez końca
 
 **Gdzie:** `frontend/src/dane/repozytorium.ts:449-462` (`posprzatajPozaOknem`)
 
 Lokalne sprzątanie kasuje wyłącznie wizyty **naprawione** starsze niż okno.
 Rekordy z ustawionym `usuniete_o` (klienci i wizyty) zostają w lokalnej bazie
 w nieskończoność — a gdy `zadanie_retencji()` usunie je fizycznie na serwerze,
-telefon nigdy się o tym nie dowie (pull przysyła tylko wiersze istniejące).
+komputer nigdy się o tym nie dowie (pull przysyła tylko wiersze istniejące).
 
 **Skutek RODO:** dane usunięte i „wyretencjonowane" w chmurze pozostają na
-telefonach mechaników bez żadnego terminu — czyli ograniczenie przechowywania
+komputerach mechaników bez żadnego terminu — czyli ograniczenie przechowywania
 (A15) obowiązuje tylko po stronie serwera.
 
 **Jak naprawić.** Rozszerzyć `posprzatajPozaOknem`:
@@ -538,7 +545,7 @@ Zapytania z `repozytorium.ts` uruchomione 1:1 na syntetycznych danych
 | 3 000 / 30 000 | 54,4 ms | 15,1 ms | 14,7 ms |
 | 6 000 / 72 000 | **127,3 ms** | 45,5 ms | 45,5 ms |
 
-Na telefonie przez `expo-sqlite` (asynchronicznie, wolniejszy CPU) realnie
+Na komputerze przez `expo-sqlite` (asynchronicznie, wolniejszy CPU) realnie
 **×3–10**. Czyli przy 6 000 kartotek `listaKlientow()` to ok. **0,4–1,3 s**.
 
 ---
@@ -568,11 +575,11 @@ wyliczonej kolumnie (bez możliwości użycia indeksu).
 **Gdzie:** `app/klient/nowy.tsx:39-44` → `repozytorium.ts:144-149`
 
 ```ts
-useEffect(() => { klienciZTymSamymTelefonem(telefon).then(setPodobni); }, [telefon]);
+useEffect(() => { klienciZTymSamymKomputerem(komputer).then(setPodobni); }, [komputer]);
 …
-export async function klienciZTymSamymTelefonem(telefon: string) {
+export async function klienciZTymSamymKomputerem(komputer: string) {
   const wszyscy = await listaKlientow();      // ← PEŁNA lista z wszystkimi licznikami
-  return wszyscy.filter((k) => samCyfry(k.telefon) === numer);
+  return wszyscy.filter((k) => samCyfry(k.komputer) === numer);
 }
 ```
 
@@ -582,10 +589,10 @@ od szóstej cyfry wzwyż. To najdroższa pojedyncza rzecz w całym interfejsie.
 
 **Jak naprawić.**
 
-1. Osobne, wąskie zapytanie: `SELECT id, nazwa, telefon FROM klienci WHERE usuniete_o IS NULL`.
-2. Docelowo kolumna `telefon_norm` w lokalnej bazie (dokładnie jak w Postgresie,
-   `norm_telefon`) + indeks → zapytanie punktowe zamiast skanu.
-3. Debounce 300 ms na polu telefonu.
+1. Osobne, wąskie zapytanie: `SELECT id, nazwa, komputer FROM klienci WHERE usuniete_o IS NULL`.
+2. Docelowo kolumna `komputer_norm` w lokalnej bazie (dokładnie jak w Postgresie,
+   `norm_komputer`) + indeks → zapytanie punktowe zamiast skanu.
+3. Debounce 300 ms na polu komputera.
 
 ---
 
@@ -604,7 +611,7 @@ kolumnie w SQL zamiast w JS.
 
 ### S4 — Wejście na profil klienta uruchamia pełną `listaKlientow()`
 
-**Gdzie:** `app/klient/[id].tsx:63` — `klienciZTymSamymTelefonem(dane.telefon)`
+**Gdzie:** `app/klient/[id].tsx:63` — `klienciZTymSamymKomputerem(dane.komputer)`
 tylko po to, żeby ewentualnie pokazać kartę „możliwy duplikat". Naprawa jak S2.
 
 ---
@@ -722,7 +729,7 @@ i filtrować po gotowej tablicy.
 | Id | Miejsce | Rzecz |
 |---|---|---|
 | **N1** | `supabase/migracje/` | **Dwie migracje o numerze 0012** (`0012_karencja…`, `0012_zatwierdzanie…`). Na produkcji zaaplikowane w kolejności *zatwierdzanie → karencja*; alfabetycznie (czyli tak, jak zrobi `supabase db push` na czystym projekcie) będzie odwrotnie. Tu akurat nie kolidują, ale numerację trzeba naprawić, zanim kogoś ugryzie. |
-| **N2** | `dane/konfiguracja.ts:KARENCJA_USUWANIA_DNI` | Karencja usuwania zaszyta w aplikacji na 30 dni, a baza trzyma `warsztaty.karencja_usuwania_dni`. Zmiana w panelu **nie dojedzie do telefonu** — `sync` nie odsyła tej wartości. Ekran pokaże inną liczbę dni niż faktycznie egzekwuje serwer. Naprawa: dopisać pole do `wspolne.warsztat` w `funkcje/sync/index.ts` i zapisać w meta. |
+| **N2** | `dane/konfiguracja.ts:KARENCJA_USUWANIA_DNI` | Karencja usuwania zaszyta w aplikacji na 30 dni, a baza trzyma `warsztaty.karencja_usuwania_dni`. Zmiana w panelu **nie dojedzie do komputera** — `sync` nie odsyła tej wartości. Ekran pokaże inną liczbę dni niż faktycznie egzekwuje serwer. Naprawa: dopisać pole do `wspolne.warsztat` w `funkcje/sync/index.ts` i zapisać w meta. |
 | **N3** | `repozytorium.ts:~355` vs `:380` | `zaktualizujWizyte` nie ustawia lokalnie `naprawione_o` (robi to trigger w bazie). Do czasu, aż serwer odeśle wiersz, `ocenUsuwanieWizyty` liczy karencję od `new Date()` — więc **bez sieci licznik „pozostało 30 dni" nie rusza z miejsca** przy każdym uruchomieniu. Naprawa: ustawiać `naprawione_o` lokalnie przy przejściu na `naprawione` i czyścić przy powrocie — dokładnie jak `trg_wizyty_naprawione`. |
 | **N4** | `dane/baza.ts:145-149, 205-210` | Migracje lokalnej bazy nie są idempotentne ani transakcyjne: `ALTER TABLE … ADD COLUMN` wywali się przy ponownym przebiegu, a `PRAGMA user_version` jest ustawiane **osobnym** `execAsync` po migracji. Przerwanie między nimi zostawia bazę w stanie nie do zmigrowania — na co `otworzIZmigruj` odpowie skasowaniem bazy (W1). Naprawa: migracja + `PRAGMA user_version` w jednej transakcji, `ALTER` poprzedzony `PRAGMA table_info`. |
 | **N5** | `repozytorium.ts:SQL_AUTA` / `wizytyKlienta` | `COLLATE NOCASE` w SQLite działa tylko na ASCII — „Świerk" i „ŚWIERK" dadzą dwie osobne zakładki auta. Postgres ma na to `norm_tekst`; lokalna baza nie ma odpowiednika. |
@@ -771,7 +778,7 @@ Pozycja oznaczona ✅ nie zostanie ponownie sprawdzona.
   bezpieczniki (`app.config.js` + `skanuj-sekrety.js`) są realne, nie deklaratywne.
 - **`tsc --noEmit` przechodzi bez jednego błędu** przy `strict: true`.
 - **Kolumnowy UPDATE (B1)** zrealizowany konsekwentnie na obu końcach —
-  `tylkoZmienione()` na telefonie i `dozwolone_kolumny()` + dynamiczny SET
+  `tylkoZmienione()` na komputerze i `dozwolone_kolumny()` + dynamiczny SET
   w `zapisz_z_telefonu`. To jest trudne i zrobione poprawnie.
 - **Idempotencja działa.** 110 wpisów w `operacje`, 0 kolizji, wszystkie ze
   statusem `ok`.
@@ -796,9 +803,9 @@ Pozycja oznaczona ✅ nie zostanie ponownie sprawdzona.
 | # | Co | Dlaczego teraz | Szacunek |
 |---|---|---|---|
 | 1 | **K2** kopia zapasowa | Najtańsza naprawa o największym skutku. Dziś nie ma żadnej kopii poza Supabase. | 15 min + test odtworzenia |
-| 2 | **K3 + W1 + W3** trwałość danych na telefonie | Jeden spójny pakiet: znacznik sync, kasowanie bazy, klucz idempotencji. Wszystkie trzy prowadzą do cichej utraty pracy mechanika. | pół dnia |
+| 2 | **K3 + W1 + W3** trwałość danych na komputerze | Jeden spójny pakiet: znacznik sync, kasowanie bazy, klucz idempotencji. Wszystkie trzy prowadzą do cichej utraty pracy mechanika. | pół dnia |
 | 3 | **K4 + W2** uwierzytelnianie i parowanie | Fail-open przy odczycie Keychain + wyścig wydający martwy token. | pół dnia |
-| 4 | **K1** izolacja warsztatów | Wymaga **decyzji produktowej**: jak telefon wskazuje warsztat przy zgłoszeniu. Do zrobienia przed drugim klientem, nie przed pierwszym. | 1 dzień + zmiana UX |
+| 4 | **K1** izolacja warsztatów | Wymaga **decyzji produktowej**: jak komputer wskazuje warsztat przy zgłoszeniu. Do zrobienia przed drugim klientem, nie przed pierwszym. | 1 dzień + zmiana UX |
 | 5 | **W4** widoczność kwarantanny, **W8/W9/W10** odporność ekranów i kolejki | Bez tego „✓ wszystko wysłane" bywa nieprawdą. | 1 dzień |
 | 6 | **W5, W6, W7** porządek w bazie i retencji | Częściowo RODO, częściowo pułapki na przyszłość. | pół dnia |
 | 7 | **R1–R9** doprowadzenie dokumentacji do stanu faktycznego | Albo dopisać brakujący pasek trybu podglądu i wskaźniki D4/D5, albo zdjąć ✅ z tych pozycji. Deklaracja bez pokrycia jest gorsza niż jawny brak. | 2 h |
@@ -833,7 +840,7 @@ Pozycja oznaczona ✅ nie zostanie ponownie sprawdzona.
 **Czego nie dało się sprawdzić bez urządzenia — do weryfikacji ręcznej:**
 - Faktyczne działanie SQLCipher, Keystore/Keychain, biometrii i wyłączenia kopii
   do iCloud/Google Drive (punkty ⚙️ z `DO-ZROBIENIA-RECZNIE.md`) — to wymaga
-  własnego builda i fizycznego telefonu.
+  własnego builda i fizycznego komputera.
 - Zgodność `react-native-keyboard-controller@1.21.9` i `reanimated@4.5.1`
   w realnym buildzie EAS.
 - Wpływ `experiments.reactCompiler: true` na wydajność list (S10) — trzeba

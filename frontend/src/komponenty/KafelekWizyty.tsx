@@ -11,7 +11,7 @@
  *
  * Wysokosc duzego kafelka jest liczona jako procent wysokosci ekranu, wiec na
  * wysokim ekranie 9:16 zawsze zajmuje ta sama czesc widoku - niezaleznie od
- * tego, czy telefon jest maly czy duzy.
+ * tego, czy komputer jest maly czy duzy.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

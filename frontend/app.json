@@ -3,73 +3,11 @@
     "name": "Warsztat",
     "slug": "warsztat",
     "version": "2.0.0",
-    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "warsztat",
     "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "pl.warsztat.app",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
-      "package": "pl.warsztat.app",
-      "adaptiveIcon": {
-        "backgroundColor": "#1D4ED8",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "blockedPermissions": [
-        "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ],
-      "permissions": [
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
-      ],
-      "softwareKeyboardLayoutMode": "resize"
-    },
     "plugins": [
-      "expo-router",
-      [
-        "expo-secure-store",
-        {
-          "configureAndroidBackup": false
-        }
-      ],
-      [
-        "expo-sqlite",
-        {
-          "useSQLCipher": true
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Odcisk palca lub Face ID sluzy do odblokowania aplikacji warsztatu."
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#1D4ED8",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
-        }
-      ],
-      "./plugins/prywatnosc.js"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": false,
@@ -84,17 +22,7 @@
       "supabaseUrl": "https://tpigqlvwjatlkhfqtlkt.supabase.co",
       "supabaseKluczPubliczny": "sb_publishable_pcwvkAD9XVEG9sDT0RGScQ_6p5UTZwt",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwaWdxbHZ3amF0bGtoZnF0bGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwMjE0MTMsImV4cCI6MjEwMzU5NzQxM30.EzdtM7UGsdyIlKuAX7JMY12jrxGuVWy6OOmRajn1MxY",
-      "router": {},
-      "eas": {
-        "projectId": "00fd2ed1-9792-4836-b132-4ce8c2674c03"
-      }
-    },
-    "owner": "jan-nastaly-studio",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/00fd2ed1-9792-4836-b132-4ce8c2674c03"
+      "router": {}
     }
   }
 }

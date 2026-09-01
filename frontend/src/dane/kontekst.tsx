@@ -3,7 +3,7 @@
  *
  * A5 - Wlasna blokada aplikacji: haslo albo odcisk palca PRZY URUCHOMIENIU
  *      APLIKACJI. Raz odblokowana sesja trwa, dopoki aplikacja zyje -
- *      przelaczenie sie na inna aplikacje, odebranie telefonu czy odlozenie
+ *      przelaczenie sie na inna aplikacje, odebranie komputera czy odlozenie
  *      go na chwile NIE zamyka dostepu. Blokada wraca dopiero, gdy system
  *      ubije proces (a w przegladarce - gdy zamkniesz karte i wejdziesz
  *      na strone od nowa), bo wtedy stan w pamieci przepada.
@@ -13,8 +13,8 @@
  *      mechanik wpisywal haslo kilkanascie razy dziennie i zaczynal ustawiac
  *      jednoznakowe. Kto chce zablokowac aplikacje od razu, ma przycisk
  *      "Zablokuj aplikacje teraz" w ustawieniach.
- * D1 - Faza aplikacji zalezy WYLACZNIE od tego, co jest na telefonie
- *      (token w Keychain, haslo, lokalna baza). Zaden brak sieci nie
+ * D1 - Faza aplikacji zalezy WYLACZNIE od tego, co jest na komputerze
+ *      (token w DPAPI, haslo, lokalna baza). Zaden brak sieci nie
  *      przelaczy mechanika na ekran logowania.
  */
 import React, {
@@ -35,7 +35,7 @@ import {
 import { OKRES_SYNC_MS } from './konfiguracja';
 
 export type Faza =
-  | 'ladowanie'      // otwieramy baze, czytamy Keychain
+  | 'ladowanie'      // otwieramy baze, czytamy klucze z DPAPI
   | 'brak_bazy'      // lokalna baza nie chce sie otworzyc - patrz `bladBazy`
   | 'parowanie'      // brak tokenu - trzeba poprosic administratora o dostep
   | 'ustaw_haslo'    // dostep jest, mechanik wybiera wlasne haslo
@@ -78,7 +78,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
   /**
    * Czy ta sesja aplikacji zostala juz odblokowana haslem. Zwykly `useRef`,
    * a wiec zmienna W PAMIECI: przepada razem z procesem aplikacji (na
-   * telefonie) albo z zamknieciem karty (w przegladarce). Dokladnie to jest
+   * komputerze) albo z zamknieciem karty (w przegladarce). Dokladnie to jest
    * definicja "trzeba wpisac haslo od nowa".
    */
   const odblokowana = useRef(false);
@@ -138,7 +138,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await otworzBaze();
-        // A4: telefon, ktory od dawna nie widzial serwera, czysci sie sam.
+        // A4: komputer, ktory od dawna nie widzial serwera, czysci sie sam.
         await sprawdzWygasniecieOffline();
         if (!zywy) return;
         await odswiezFaze();
@@ -166,7 +166,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
   // Nasluch stanu sieci chodzi przez CALE zycie aplikacji, nie tylko gdy
   // ekran jest odblokowany. Zmiany zapisane tuz przed utrata zasiegu maja
   // dojsc do serwera, gdy tylko wroci - bez czekania na to, az mechanik
-  // otworzy telefon.
+  // otworzy komputer.
   useEffect(() => uruchomWznawianiePoSieci(), []);
 
   // Rola moze sie zmienic po stronie serwera (administrator kogos awansowal
@@ -209,8 +209,8 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
 
   /* -------------------- cykliczna synchronizacja w tle -------------------
      Chodzi takze przy ZABLOKOWANYM ekranie. Dwa powody: dane sa swieze juz
-     w chwili wpisania hasla, a polecenie "zablokuj / wyczysc ten telefon"
-     dociera nawet wtedy, gdy nikt tego telefonu nie odblokowuje (A4, A6). */
+     w chwili wpisania hasla, a polecenie "zablokuj / wyczysc ten komputer"
+     dociera nawet wtedy, gdy nikt tego komputera nie odblokowuje (A4, A6). */
   useEffect(() => {
     if (faza !== 'gotowa' && faza !== 'zablokowana') return undefined;
     synchronizuj();
@@ -220,7 +220,7 @@ export function AplikacjaProvider({ children }: { children: React.ReactNode }) {
 
   /* ------------- wrocil internet: rusz od razu, nie czekaj na cykl ------- */
   useEffect(() => {
-    // Zdarzenie `online` istnieje tylko w przegladarce. Na telefonie te sama
+    // Zdarzenie `online` istnieje tylko w przegladarce. Na komputerze te sama
     // robote wykonuje `uruchomWznawianiePoSieci()` wyzej - nasluch stanu sieci
     // z expo-network plus ponawianie z rosnaca przerwa. Tu zostaje wersja
     // webowa, zeby podglad na localhost tez dogonil serwer po przerwie.

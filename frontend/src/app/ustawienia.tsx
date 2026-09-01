@@ -11,7 +11,7 @@
  * je natychmiast.
  *
  * Poza tym mechanik widzi tu:
- *  A4  po ilu dniach bez polaczenia telefon sam skasuje swoje dane,
+ *  A4  po ilu dniach bez polaczenia program sam skasuje swoje dane,
  *  A10 informacje, ze wgladu w kartoteki sa zapisywane.
  *
  * Nie ma i nie bedzie funkcji "eksportuj wszystko do pliku" (A10) - nic tak
@@ -90,23 +90,26 @@ export default function EkranUstawien() {
         />
         <Wiersz etykieta="Wersja aplikacji" wartosc={WERSJA_APLIKACJI} />
         <Wiersz etykieta="Wersja danych" wartosc={String(WERSJA_SCHEMATU)} />
-        <Wiersz etykieta="Historia na telefonie" wartosc={`${okno ?? '90'} dni + wszystko otwarte`} />
+        <Wiersz
+          etykieta="Historia na komputerze"
+          wartosc={`${okno ?? '90'} dni + wszystko otwarte`}
+        />
         <Wiersz
           etykieta="Numer urzadzenia"
           wartosc={urzadzenie ? `${urzadzenie.slice(0, 8)}...` : '-'}
         />
         <Text style={style.podpowiedz}>
-          Podaj numer urzadzenia administratorowi, jesli prosi o identyfikacje telefonu.
+          Podaj numer urzadzenia administratorowi, jesli prosi o identyfikacje stanowiska.
         </Text>
       </Sekcja>
 
       {czyAdministrator ? (
         <Sekcja tytul="ZARZADZANIE DOSTEPEM">
           <Text style={style.podpowiedz}>
-            Jako administrator warsztatu mozesz przyznac dostep telefonowi
+            Jako administrator warsztatu mozesz przyznac dostep komputerowi
             mechanika - zdalnie, jednorazowym kodem z jego ekranu, bez podawania
-            zadnego hasla - oraz odebrac dostep, gdy ktos odchodzi albo zgubi
-            telefon. Poza tym widzisz dokladnie to samo co kazdy mechanik.
+            zadnego hasla - oraz odebrac dostep, gdy ktos odchodzi. Poza tym
+            widzisz dokladnie to samo co kazdy mechanik.
           </Text>
           <Przycisk
             tytul="Otworz zarzadzanie dostepem"
@@ -118,15 +121,15 @@ export default function EkranUstawien() {
       <Sekcja tytul="BEZPIECZENSTWO">
         <View style={style.informacja}>
           <Text style={style.informacjaTekst}>
-            Haslo podajesz raz - przy uruchomieniu aplikacji. Przelaczenie sie na
-            inna aplikacje ani odlozenie telefonu nie zamyka dostepu; blokada wraca
-            dopiero po zamknieciu i ponownym otwarciu aplikacji. Kiedy oddajesz
-            telefon komus na chwile, uzyj przycisku ponizej.
+            Haslo podajesz raz - przy uruchomieniu programu. Przelaczenie sie na
+            inne okno nie zamyka dostepu; blokada wraca dopiero po zamknieciu
+            i ponownym otwarciu programu. Kiedy odchodzisz od komputera,
+            uzyj przycisku ponizej.
           </Text>
           <Text style={style.informacjaTekst}>
-            Jesli telefon nie polaczy sie z serwerem przez {wygasniecie ?? '14'} dni,
-            skasuje dane warsztatu ze swojej pamieci. To zabezpieczenie na wypadek
-            zgubienia albo kradziezy - zgubiony telefon czysci sie sam.
+            Jesli ten komputer nie polaczy sie z serwerem przez {wygasniecie ?? '14'} dni,
+            skasuje dane warsztatu ze swojego dysku. To zabezpieczenie na wypadek
+            kradziezy - skradziony komputer czysci sie sam.
           </Text>
           <Text style={style.informacjaTekst}>
             Otwarcia kartotek klientow sa zapisywane w dzienniku dostepu warsztatu.
@@ -138,13 +141,13 @@ export default function EkranUstawien() {
 
         <Przycisk tytul="Zablokuj aplikacje teraz" wariant="drugi" onPress={zablokuj} />
         <Przycisk
-          tytul="Wyloguj i wyczysc ten telefon"
+          tytul="Wyloguj i wyczysc ten komputer"
           wariant="niebezpieczny"
           onPress={() => setPytanieOWylogowanie(true)}
         />
         <Text style={style.podpowiedz}>
-          Wylogowanie kasuje z telefonu wszystkie dane warsztatu. Zrob to, zanim
-          oddasz telefon komukolwiek innemu.
+          Wylogowanie kasuje z dysku wszystkie dane warsztatu. Zrob to, zanim
+          oddasz ten komputer komukolwiek innemu.
         </Text>
       </Sekcja>
 
@@ -155,7 +158,7 @@ export default function EkranUstawien() {
           tresc={wKolejce > 0
             ? `UWAGA: ${wKolejce} zmian nie zostalo jeszcze wyslanych na serwer i przepadnie. `
               + 'Najpierw polacz sie z internetem i poczekaj, az licznik pokaze zero.'
-            : 'Wszystkie dane warsztatu znikna z tego telefonu. Zeby wrocic do pracy, '
+            : 'Wszystkie dane warsztatu znikna z tego komputera. Zeby wrocic do pracy, '
               + 'administrator bedzie musial przyznac dostep od nowa.'}
           tekstAkcji="Wyloguj i wyczysc"
           tekstAnuluj="Anuluj"

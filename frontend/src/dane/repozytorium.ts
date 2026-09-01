@@ -1,5 +1,5 @@
 /**
- * Odczyt i zapis danych warsztatu - wszystko na lokalnej bazie telefonu.
+ * Odczyt i zapis danych warsztatu - wszystko na lokalnej bazie komputera.
  *
  * Zadna funkcja z tego pliku nie dotyka sieci. Zapis konczy sie w chwili,
  * gdy dane sa w SQLite; wyslanie na serwer to osobna sprawa, ktora dzieje
@@ -18,7 +18,7 @@ import type {
 
 const teraz = () => new Date().toISOString();
 
-/** B5/B12: identyfikator powstaje na telefonie i nie zmienia sie nigdy - ani
+/** B5/B12: identyfikator powstaje na komputerze i nie zmienia sie nigdy - ani
  *  przy ponowieniu wysylki, ani po stronie serwera. */
 export const nowyId = (): string => Crypto.randomUUID();
 
@@ -29,7 +29,7 @@ export const nowyId = (): string => Crypto.randomUUID();
 /**
  * Pelna lista klientow z licznikami.
  * B4: liczniki sa liczone COUNT-em przy kazdym odczycie, a nie trzymane
- * w kolumnie. Dwa telefony offline nie moga sobie zgubic przyrostu.
+ * w kolumnie. Dwa komputery offline nie moga sobie zgubic przyrostu.
  */
 export async function listaKlientow(): Promise<KlientNaLiscie[]> {
   const db = await baza();
@@ -137,6 +137,22 @@ export async function wizytyDnia(data: string, pomin?: string | null): Promise<W
       AND w.id <> ?
     ORDER BY w.godzina_od
   `, data, pomin ?? '');
+}
+
+/**
+ * Dni z zaplanowana wizyta w podanym zakresie - kropki pod dniami w siatce
+ * miesiaca. Zakres to zwykle jeden widoczny miesiac, wiec zapytanie jest tanie.
+ */
+export async function dniZWizytami(od: string, do_: string): Promise<string[]> {
+  const db = await baza();
+  const wiersze = await db.getAllAsync<{ data_wizyty: string }>(`
+    SELECT DISTINCT data_wizyty
+    FROM wizyty
+    WHERE usuniete_o IS NULL
+      AND godzina_od IS NOT NULL
+      AND data_wizyty BETWEEN ? AND ?
+  `, od, do_);
+  return wiersze.map((w) => w.data_wizyty);
 }
 
 export async function pobierzWizyte(id: string): Promise<Wizyta | null> {
@@ -276,7 +292,7 @@ export async function usunKlienta(id: string): Promise<void> {
   await dodajDoKolejki('klienci', id, 'usun', {}, czas);
 }
 
-/** B3: scalenie kartotek zalozonych niezaleznie przez dwa telefony. */
+/** B3: scalenie kartotek zalozonych niezaleznie przez dwa komputery. */
 export async function scalKlientow(zrodloId: string, celId: string): Promise<void> {
   const db = await baza();
   const czas = teraz();
@@ -298,7 +314,7 @@ export type DaneWizyty = {
 };
 
 /**
- * B5: numer roboczy z prefiksem warsztatu powstaje na telefonie, zeby
+ * B5: numer roboczy z prefiksem warsztatu powstaje na komputerze, zeby
  * mechanik mial czym nazwac zlecenie od razu. Numer OFICJALNY nadaje serwer
  * przy synchronizacji - dzieki temu dwa warsztaty offline nie wygeneruja
  * tego samego "ZL/2026/0001".
@@ -467,8 +483,8 @@ export async function zapiszWDzienniku(
 /* ====================================================================== */
 /*  A3 / D10 - sprzatanie lokalnej bazy                                   */
 /*  Ta sama regula co po stronie serwera: trzymamy okno historii plus      */
-/*  wszystko otwarte. Dzieki temu baza na telefonie nie rosnie w nieskonczonosc,*/
-/*  a razem ze zgubionym telefonem nie wyciekaja lata dokumentacji.        */
+/*  wszystko otwarte. Dzieki temu baza na komputerze nie rosnie w nieskonczonosc,*/
+/*  a razem ze zgubionym komputerem nie wyciekaja lata dokumentacji.        */
 /* ====================================================================== */
 
 export async function posprzatajPozaOknem(oknoDni: number): Promise<number> {

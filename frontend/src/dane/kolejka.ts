@@ -4,7 +4,7 @@
  * B8 - to jest miejsce, w ktorym najlatwiej cicho stracic prace mechanika.
  *      Zasady, ktore tego pilnuja:
  *        * kolejka jest w SQLite, wiec przezywa restart, crash i wylaczenie
- *          telefonu,
+ *          komputera,
  *        * kazda pozycja albo zostaje przyjeta przez serwer, albo ladzie
  *          w jego kwarantannie - w obu wypadkach znika z kolejki, wiec
  *          nastepne pozycje nigdy nie stoja za jedna zepsuta,

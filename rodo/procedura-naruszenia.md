@@ -27,9 +27,9 @@
 
 Wykonaj **w tej kolejności**. Nie analizuj, dopóki nie zamkniesz dostępu.
 
-1. **Zgubiony lub skradziony telefon** →
+1. **Zgubiony lub skradziony komputer** →
    Panel administratora → **Dostęp** → przy mechaniku „Wyrejestruj (zgubiony)”.
-   Telefon przy najbliższej próbie połączenia skasuje dane. Jeśli nigdy się nie
+   Komputer przy najbliższej próbie połączenia skasuje dane. Jeśli nigdy się nie
    połączy — sam się wyczyści po `[14]` dniach bez synchronizacji.
 2. **Podejrzenie, że wyciekł klucz `service_role`** →
    panel Supabase → *Settings → API Keys* → **rotacja klucza**.

@@ -2,26 +2,24 @@
  * Bezpieczna pamiec na token urzadzenia, weryfikator hasla i klucz szyfrowania
  * lokalnej bazy.
  *
- * NA TELEFONIE (android / ios) — Keychain / Keystore, z flaga
- * `WHEN_UNLOCKED_THIS_DEVICE_ONLY`: wartosci sa chronione sprzetowo, dostepne
- * dopiero po odblokowaniu telefonu i NIE przenosza sie kopia zapasowa na inne
- * urzadzenie (A4, A12).
+ * W PROGRAMIE NA WINDOWS — wartosci leza w pliku `klucze.json` w katalogu
+ * danych aplikacji, kazda zaszyfrowana przez DPAPI (`safeStorage` Electrona).
+ * Odszyfrowuje je wylacznie to konto Windows na tym komputerze: skopiowanie
+ * pliku na inny komputer albo na konto kolegi daje szyfrogram (A4).
+ * Kryptografia siedzi w procesie glownym — ekrany nigdy nie widza ani klucza
+ * DPAPI, ani pliku.
  *
- * W PRZEGLADARCE — zwykly localStorage, bo Keychain tam po prostu nie istnieje.
- * To znaczy dokladnie tyle, ze wersja webowa **nie nadaje sie do pracy na
- * prawdziwych danych klientow** i sluzy wylacznie do ogladania interfejsu na
- * localhost. Aplikacja mowi o tym wprost paskiem ostrzegawczym, zamiast udawac,
- * ze jest inaczej — cicha degradacja zabezpieczen bylaby gorsza niz jej brak.
+ * W PRZEGLADARCE (`npm run web`) — zwykly localStorage, bo DPAPI tam nie
+ * istnieje. To znaczy dokladnie tyle, ze wersja przegladarkowa **nie nadaje
+ * sie do pracy na prawdziwych danych klientow** i sluzy wylacznie do
+ * ogladania interfejsu na localhost. Aplikacja mowi o tym wprost paskiem
+ * ostrzegawczym, zamiast udawac, ze jest inaczej — cicha degradacja
+ * zabezpieczen bylaby gorsza niz jej brak.
  */
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { MOST, NA_WINDOWS } from './mostWindows';
 
-/** true = przegladarka: brak Keychain, brak szyfrowania bazy, tryb podgladu. */
-export const TRYB_PODGLADU = Platform.OS === 'web';
-
-const OPCJE: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-};
+/** true = przegladarka: brak DPAPI, brak szyfrowania bazy, tryb podgladu. */
+export const TRYB_PODGLADU = !NA_WINDOWS;
 
 const PREFIKS_WEB = 'podglad.';
 
@@ -34,22 +32,22 @@ function magazynWeb(): Storage | null {
 }
 
 export async function czytaj(klucz: string): Promise<string | null> {
-  if (TRYB_PODGLADU) return magazynWeb()?.getItem(PREFIKS_WEB + klucz) ?? null;
-  return SecureStore.getItemAsync(klucz, OPCJE).catch(() => null);
+  if (!MOST) return magazynWeb()?.getItem(PREFIKS_WEB + klucz) ?? null;
+  return MOST.klucz.czytaj(klucz).catch(() => null);
 }
 
 export async function zapisz(klucz: string, wartosc: string): Promise<void> {
-  if (TRYB_PODGLADU) {
+  if (!MOST) {
     magazynWeb()?.setItem(PREFIKS_WEB + klucz, wartosc);
     return;
   }
-  await SecureStore.setItemAsync(klucz, wartosc, OPCJE);
+  await MOST.klucz.zapisz(klucz, wartosc);
 }
 
 export async function skasuj(klucz: string): Promise<void> {
-  if (TRYB_PODGLADU) {
+  if (!MOST) {
     magazynWeb()?.removeItem(PREFIKS_WEB + klucz);
     return;
   }
-  await SecureStore.deleteItemAsync(klucz, OPCJE).catch(() => undefined);
+  await MOST.klucz.skasuj(klucz).catch(() => undefined);
 }

@@ -1,7 +1,7 @@
 /**
  * A2 - skaner sekretow w repozytorium.
  *
- * Plik .apk i .ipa rozpakowuje sie w kilka minut, a historia gita pamieta
+ * Paczke programu rozpakowuje sie w kilka minut, a historia gita pamieta
  * wszystko. Ten skrypt szuka kluczy, ktore nigdy nie powinny trafic do
  * repozytorium ani do paczki aplikacji.
  *
@@ -17,7 +17,7 @@ import path from 'node:path';
 import { KATALOG_PROJEKTU } from '../src/config.js';
 
 const POMIJANE_KATALOGI = new Set([
-  'node_modules', '.git', '.expo', 'dist', 'build', 'kopie', '.next', 'android', 'ios',
+  'node_modules', '.git', '.expo', 'dist', 'build', 'kopie', '.next',
 ]);
 const POMIJANE_PLIKI = new Set(['package-lock.json', 'yarn.lock', 'skanuj-sekrety.js']);
 const ROZSZERZENIA = new Set([
@@ -53,10 +53,10 @@ const WZORY = [
   },
   {
     // Najgrozniejsza pomylka w tym projekcie: sekret pod prefiksem, ktory
-    // Expo wkleja na stale do paczki .apk / .ipa. Taki klucz jest publiczny
+    // Expo wkleja na stale do zbudowanych ekranow. Taki klucz jest publiczny
     // w chwili zbudowania aplikacji - nawet jesli plik .env nigdy nie trafi
     // do repozytorium. app.config.js lapie to przy buildzie, a skaner tutaj.
-    nazwa: 'SEKRET pod prefiksem EXPO_PUBLIC_ (trafilby do paczki .apk!)',
+    nazwa: 'SEKRET pod prefiksem EXPO_PUBLIC_ (trafilby do paczki programu!)',
     wzor: /^EXPO_PUBLIC_[A-Z0-9_]*(?:SERVICE_ROLE|SECRET|PASSWORD|PRIVATE)[A-Z0-9_]*=.+$/gm,
     // Nie ma znaczenia, czy plik jest w .gitignore - Expo i tak wklei
     // te wartosc do paczki aplikacji przy budowaniu.

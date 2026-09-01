@@ -1,13 +1,13 @@
 /**
  * Blokada aplikacji: ustawienie hasla i codzienne odblokowywanie.
  *
- * A5 - Wlasna blokada, nie tylko systemowa. Telefon lezacy otwarty na
+ * A5 - Wlasna blokada, nie tylko systemowa. Komputer lezacy otwarty na
  *      warsztacie nie pokazuje danych klientow po 5 minutach bezczynnosci
  *      ani po przelaczeniu aplikacji w tlo.
  * D1 - Ten ekran NIE ROZMAWIA Z SIECIA. Odblokowanie dziala tak samo
  *      w kanale bez zasiegu jak przy Wi-Fi.
  * A4 - Po dziesieciu nieudanych probach aplikacja kasuje lokalna baze.
- *      Znaleziony telefon nie jest darmowa kartoteka klientow.
+ *      Znaleziony komputer nie jest darmowa kartoteka klientow.
  *
  * Haslo moze byc dowolne - to blokada aplikacji, a nie haslo do bazy.
  * Dostepu do danych w chmurze pilnuje token urzadzenia, ktory administrator
@@ -20,7 +20,7 @@ import {
 
 import { Pole, Przycisk } from './Formularz';
 import {
-  biometriaDostepna, odblokujBiometria, pozostaleProby, sprawdzHaslo, ustawHaslo,
+  pozostaleProby, sprawdzHaslo, ustawHaslo,
 } from '../dane/sesja';
 import { pobierzToken } from '../dane/sesja';
 import { zglosUstawienieHasla } from '../dane/chmura';
@@ -39,7 +39,7 @@ export function EkranUstawieniaHasla() {
 
   const zapisz = useCallback(async () => {
     if (!haslo.trim()) {
-      setBlad('Wpisz haslo. Moze byc dowolne - to blokada aplikacji na tym telefonie.');
+      setBlad('Wpisz haslo. Moze byc dowolne - to blokada aplikacji na tym komputerze.');
       return;
     }
     if (haslo !== powtorzenie) {
@@ -77,10 +77,10 @@ export function EkranUstawieniaHasla() {
             {sync.resetHasla
               ? 'Administrator poprosil o zmiane hasla do tej aplikacji.'
               : `Masz juz dostep${mechanik ? `, ${mechanik}` : ''}. Wymysl haslo, ktorym `
-                + 'bedziesz otwierac aplikacje na tym telefonie.'}
+                + 'bedziesz otwierac aplikacje na tym komputerze.'}
           </Text>
           <Text style={style.podpowiedz}>
-            Haslo moze byc dowolne - dziala tylko na tym telefonie i nie otwiera
+            Haslo moze byc dowolne - dziala tylko na tym komputerze i nie otwiera
             niczego w internecie. Jesli je zapomnisz, administrator jednym
             klikniciem pozwoli Ci ustawic nowe.
           </Text>
@@ -115,10 +115,8 @@ export function EkranOdblokowania() {
   const [zajety, setZajety] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
   const [proby, setProby] = useState<number | null>(null);
-  const [biometria, setBiometria] = useState(false);
 
   useEffect(() => {
-    biometriaDostepna().then(setBiometria);
     pozostaleProby().then(setProby);
   }, []);
 
@@ -127,16 +125,6 @@ export function EkranOdblokowania() {
     await zapiszWDzienniku('odblokowanie');
     odblokowano();
   }, [odblokowano]);
-
-  const przezBiometrie = useCallback(async () => {
-    if (await odblokujBiometria()) await wpuscDoSrodka();
-  }, [wpuscDoSrodka]);
-
-  // Odcisk palca proponujemy od razu - to najszybsza droga do pracy.
-  useEffect(() => {
-    if (biometria) przezBiometrie();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [biometria]);
 
   const przezHaslo = useCallback(async () => {
     setZajety(true);
@@ -149,7 +137,7 @@ export function EkranOdblokowania() {
       }
       if ('wyczyszczono' in wynik) {
         setBlad('Za duzo nieudanych prob. Dane warsztatu zostaly skasowane '
-          + 'z tego telefonu. Popros administratora o ponowne przyznanie dostepu.');
+          + 'z tego komputera. Popros administratora o ponowne przyznanie dostepu.');
         setProby(0);
         return;
       }
@@ -179,7 +167,7 @@ export function EkranOdblokowania() {
             onChangeText={setHaslo}
             secureTextEntry
             autoCapitalize="none"
-            autoFocus={!biometria}
+            autoFocus
             onSubmitEditing={przezHaslo}
             returnKeyType="go"
           />
@@ -188,14 +176,11 @@ export function EkranOdblokowania() {
           {proby !== null && proby <= 3 && proby > 0 && !blad ? (
             <Text style={style.blad}>
               Uwaga: po {proby} kolejnych nieudanych probach aplikacja skasuje dane
-              z tego telefonu.
+              z tego komputera.
             </Text>
           ) : null}
 
           <Przycisk tytul="Odblokuj" onPress={przezHaslo} zajety={zajety} />
-          {biometria ? (
-            <Przycisk tytul="Uzyj odcisku palca" wariant="drugi" onPress={przezBiometrie} />
-          ) : null}
 
           <Text style={style.podpowiedz}>
             Nie pamietasz hasla? Popros administratora - w panelu jednym klikniciem

@@ -25,8 +25,8 @@ type PoleProps = TextInputProps & {
  * Oko "pokaz haslo" narysowane samymi widokami.
  *
  * Swiadomie bez biblioteki ikon: caly projekt nie ma ani jednej, a dokladanie
- * kilku megabajtow fontow do paczki .apk dla jednego znaczka byloby zla
- * wymiana. Ksztalt jest ten sam na Androidzie, iOS i w przegladarce.
+ * kilku megabajtow fontow do paczki programu dla jednego znaczka byloby zla
+ * wymiana. Ksztalt jest ten sam w programie i w przegladarce.
  */
 function IkonaOka({ przekreslone }: { przekreslone: boolean }) {
   return (

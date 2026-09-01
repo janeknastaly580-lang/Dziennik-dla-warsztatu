@@ -9,7 +9,7 @@
  *     opisow wpisanych przy wizytach - nie ma kartoteki pojazdow.
  *  4. Kafelki nienaprawionych sa znacznie wieksze niz naprawionych.
  *
- * B3 - jesli inny telefon zalozyl kartoteke z tym samym numerem telefonu,
+ * B3 - jesli inny komputer zalozyl kartoteke z tym samym numerem telefonu,
  *      na gorze pojawia sie propozycja scalenia. Offline nie da sie tego
  *      wykryc automatycznie, wiec mechanik dostaje narzedzie do posprzatania.
  * A10 - wejscie na kartoteke ladzie w dzienniku dostepu.
@@ -117,7 +117,7 @@ export default function EkranProfiluKlienta() {
       <View style={style.ekran}>
         <Stack.Screen options={{ title: 'Profil klienta' }} />
         <KomunikatBledu
-          tresc={'Nie znaleziono tej kartoteki na telefonie. Mogla zostac usunieta '
+          tresc={'Nie znaleziono tej kartoteki na komputerze. Mogla zostac usunieta '
             + 'albo wypasc z okna synchronizacji.'}
           onPonow={odswiez}
         />
@@ -130,7 +130,7 @@ export default function EkranProfiluKlienta() {
   const naglowek = (
     <View>
 
-      {/* B3: propozycja scalenia duplikatu zalozonego na innym telefonie */}
+      {/* B3: propozycja scalenia duplikatu zalozonego na innym komputerze */}
       {duplikaty.map((d) => (
         <Pressable
           key={d.id}

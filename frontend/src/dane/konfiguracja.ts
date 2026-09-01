@@ -3,7 +3,7 @@
  *
  * A2 - w aplikacji jest WYLACZNIE klucz publiczny (publishable albo anon).
  * To swiadome: taki klucz i tak jest publiczny z zalozenia, bo siedzi
- * w paczce .apk/.ipa, ktora kazdy moze rozpakowac. Dlatego w bazie nie daje
+ * w paczce programu, ktora kazdy moze rozpakowac. Dlatego w bazie nie daje
  * on dostepu do niczego - kazda tabela ma RLS bez zadnej polityki, a role
  * anon i authenticated nie maja nawet prawa wejscia do schematu.
  * Sprawdzenie: supabase/testy/test-anon.ps1
@@ -66,7 +66,7 @@ export const DOMYSLNE_OKNO_DNI = 90;
  * Aplikacja uzywa tej liczby tylko po to, zeby SCHOWAC przycisk i wyjasnic
  * mechanikowi dlaczego. Prawda jest po stronie bazy (kolumna
  * `warsztaty.karencja_usuwania_dni` i funkcja `mozna_usunac_wizyte`), wiec
- * nawet podmieniony zapis z telefonu odbije sie od serwera.
+ * nawet podmieniony zapis z komputera odbije sie od serwera.
  */
 export const KARENCJA_USUWANIA_DNI = 30;
 

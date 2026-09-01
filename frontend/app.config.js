@@ -9,14 +9,15 @@
  * a schemat konfiguracji Expo odrzuca dodatkowe pola (nawet nazwane "//").
  * `npx expo-doctor` zglaszal je jako blad, wiec opisy zyja w tym pliku.
  *
- * WERSJA WEBOWA sluzy wylacznie do podgladu interfejsu na localhost.
- * W przegladarce nie ma Keychain/Keystore ani SQLCipher, wiec aplikacja
- * mowi o tym paskiem ostrzegawczym i nie nadaje sie do pracy na prawdziwych
- * danych klientow. Do warsztatu idzie APK / IPA.
+ * WERSJA W PRZEGLADARCE (`npm run web`) sluzy wylacznie do podgladu
+ * interfejsu na localhost. Nie ma tam ani DPAPI, ani SQLCipher, wiec
+ * aplikacja mowi o tym paskiem ostrzegawczym i nie nadaje sie do pracy na
+ * prawdziwych danych klientow. Do warsztatu idzie program Windows
+ * (katalog `windows/`).
  *
  * PODZIAL KLUCZY (ryzyko A2), pilnowany strażnikiem ponizej:
  *
- *   frontend/.env  →  tylko EXPO_PUBLIC_*  →  ląduje w paczce .apk/.ipa
+ *   frontend/.env  →  tylko EXPO_PUBLIC_*  →  ląduje w paczce programu
  *                     adres + klucz publishable / anon
  *                     publiczne z definicji, nie dają dostępu do niczego
  *
@@ -31,17 +32,17 @@
 /* ---------------------------------------------------------------------
  *  ADRES CHMURY WPISANY NA STALE
  *
- *  Aplikacja NIGDY nie pyta uzytkownika o adres serwera - ani na telefonie,
- *  ani w przegladarce. Te trzy wartosci sa tu wpisane wprost, zeby po
- *  sciagnieciu repozytorium wystarczylo `npm start` albo `eas build`, bez
- *  kopiowania zadnego pliku i bez wklejania czegokolwiek na ekranie.
+ *  Aplikacja NIGDY nie pyta uzytkownika o adres serwera. Te trzy wartosci sa
+ *  tu wpisane wprost, zeby po sciagnieciu repozytorium wystarczylo
+ *  `npm run web` albo zbudowanie programu, bez kopiowania zadnego pliku
+ *  i bez wklejania czegokolwiek na ekranie.
  *
  *  Mozna je nadpisac przez frontend/.env (zmienne EXPO_PUBLIC_*) - to jedyny
  *  potrzebny ruch, gdy warsztat przenosi sie na inny projekt Supabase.
  *
  *  Dlaczego wolno je trzymac w repozytorium: to sa klucze PUBLICZNE. Expo
- *  i tak wkleja je na stale do paczki .apk / .ipa, a paczke da sie rozpakowac
- *  w kilka minut. W bazie nie daja dostepu do niczego - kazda tabela ma RLS
+ *  i tak wkleja je na stale do zbudowanych ekranow, a paczke programu da sie
+ *  rozpakowac w kilka minut. W bazie nie daja dostepu do niczego - kazda tabela ma RLS
  *  bez zadnej polityki, role anon i authenticated nie maja wstepu do schematu
  *  public, a dane wydaje wylacznie funkcja brzegowa po sprawdzeniu tokenu
  *  urzadzenia. Sprawdzenie: supabase/testy/test-anon.ps1
@@ -73,7 +74,7 @@ function sprawdzKlucz(nazwa, klucz) {
   if (klucz.startsWith('sb_secret_')) {
     throw new Error(
       `\n\n  ${nazwa} zawiera klucz SEKRETNY (sb_secret_...).\n`
-      + '  Ten klucz omija wszystkie zabezpieczenia bazy, a paczka aplikacji\n'
+      + '  Ten klucz omija wszystkie zabezpieczenia bazy, a paczka programu\n'
       + '  jest publiczna. Przenies go do narzedzia/.env i wstaw tutaj klucz\n'
       + '  publishable albo anon.\n',
     );
@@ -83,8 +84,8 @@ function sprawdzKlucz(nazwa, klucz) {
   if (rola && rola !== 'anon') {
     throw new Error(
       `\n\n  ${nazwa} zawiera token z rola "${rola}", a nie "anon".\n`
-      + '  Klucz service_role nie moze trafic do aplikacji mobilnej - kazdy,\n'
-      + '  kto rozpakuje .apk, mialby wtedy cala baze klientow.\n'
+      + '  Klucz service_role nie moze trafic do aplikacji - kazdy,\n'
+      + '  kto rozpakuje program, mialby wtedy cala baze klientow.\n'
       + '  Jesli ten klucz gdzies juz wyciekl: ZROTUJ go w panelu Supabase.\n',
     );
   }

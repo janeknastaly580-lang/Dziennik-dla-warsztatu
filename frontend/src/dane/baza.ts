@@ -1,5 +1,5 @@
 /**
- * Lokalna baza SQLite na telefonie - JEDYNE zrodlo danych dla ekranow.
+ * Lokalna baza SQLite na komputerze - JEDYNE zrodlo danych dla ekranow.
  *
  * D1 - To jest sedno odpornosci na brak sieci: ekrany NIGDY nie czytaja
  *      z sieci. Czytaja stad. Synchronizacja tylko dolewa i odlewa dane
@@ -8,42 +8,44 @@
  *
  * B2 - `usuniete_o` zamiast kasowania. To samo, co w chmurze.
  * B4 - zero kolumn z licznikami. Liczniki liczy COUNT() przy odczycie,
- *      wiec dwa telefony nie moga sobie nawzajem zgubic przyrostu.
+ *      wiec dwa komputery nie moga sobie nawzajem zgubic przyrostu.
  * D5 - kolumna `oczekuje` mowi, czy rekord czeka jeszcze na wyslanie.
  *      Z tego biora sie zegarek i ptaszek przy kafelkach.
  *
- * A4  - Plik bazy jest SZYFROWANY (SQLCipher) NA TELEFONIE. Klucza nie ma
- *       w kodzie:
- *       powstaje losowo przy pierwszym uruchomieniu i lezy w Keychain /
- *       Keystore z flaga "tylko to urzadzenie". Wyjecie karty pamieci albo
- *       skopiowanie pliku bazy z zgubionego telefonu daje szyfrogram.
- *       Wymaga wlasnego builda (app.json -> expo-sqlite: useSQLCipher).
- *       W PRZEGLADARCE SQLCipher nie istnieje - dlatego wersja webowa jest
+ * A4  - Plik bazy jest SZYFROWANY (SQLCipher) NA DYSKU KOMPUTERA. Klucza nie
+ *       ma w kodzie: powstaje losowo przy pierwszym uruchomieniu i lezy
+ *       w DPAPI Windows, czyli w szyfrowaniu przypisanym do tego konta i tego
+ *       komputera. Skopiowanie pliku bazy z dysku - albo samego dysku -
+ *       daje szyfrogram.
+ *       Sama baza siedzi w procesie glownym programu (`windows/glowny.js`),
+ *       a ekrany rozmawiaja z nia przez waski most (`mostWindows.ts`).
+ *       W PRZEGLADARCE SQLCipher nie istnieje - dlatego `npm run web` jest
  *       wylacznie podgladem interfejsu i mowi o tym wprost.
  *
- * A12 - Wtyczka `plugins/prywatnosc.js` wyklucza dane aplikacji z kopii
- *       zapasowej iCloud i Google Drive. Sprawdz to po zbudowaniu, nie zakladaj.
+ * A12 - Dane leza w katalogu aplikacji uzytkownika (AppData), ktorego Windows
+ *       nie synchronizuje z OneDrive. Sprawdz to po zbudowaniu, nie zakladaj.
  */
 import * as Crypto from 'expo-crypto';
 import * as SQLite from 'expo-sqlite';
 
-import { TRYB_PODGLADU, czytaj, skasuj, zapisz } from './pamiecBezpieczna';
+import { type Baza, NA_WINDOWS, bazaWindows, most } from './mostWindows';
+import { czytaj, skasuj, zapisz } from './pamiecBezpieczna';
 
 export const NAZWA_BAZY = 'warsztat.db';
 
 const K_KLUCZ_BAZY = 'warsztat_klucz_bazy';
 
-let polaczenie: SQLite.SQLiteDatabase | null = null;
+let polaczenie: Baza | null = null;
 /**
  * Trwajace otwarcie bazy. Bez tego dwa rownolegle wywolania `otworzBaze()`
  * (a takie zdarzaja sie przy starcie: kontekst aplikacji, sprawdzenie
  * wygasniecia offline i pierwszy odczyt ekranu ruszaja naraz) otwieraja
- * DWA polaczenia do tego samego pliku. Na telefonie konczy sie to blokada
+ * DWA polaczenia do tego samego pliku. Na komputerze konczy sie to blokada
  * zapisu, a w przegladarce rozjezdza sie inicjalizacja WebAssembly
  * w expo-sqlite i baza w ogole sie nie otwiera
  * ("Invalid VFS state", potem "Error code 14: unable to open database file").
  */
-let otwieranie: Promise<SQLite.SQLiteDatabase> | null = null;
+let otwieranie: Promise<Baza> | null = null;
 
 /**
  * 256-bitowy klucz szyfrowania lokalnej bazy. Przy pierwszym uruchomieniu
@@ -73,6 +75,11 @@ export async function skasujKluczBazy(): Promise<void> {
   }
   polaczenie = null;
   otwieranie = null;
+
+  if (NA_WINDOWS) {
+    await most().baza.skasuj().catch(() => undefined);
+    return;
+  }
   await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
 }
 
@@ -166,18 +173,18 @@ const MIGRACJE: string[] = [
  * (x'...'), wiec SQLCipher nie przepuszcza go przez wolne wyprowadzanie klucza
  * i nie ma tu miejsca na wstrzykniecie - to 64 znaki szesnastkowe.
  */
-async function otworzZaszyfrowana(): Promise<SQLite.SQLiteDatabase> {
-  const db = await SQLite.openDatabaseAsync(NAZWA_BAZY);
+async function otworzZaszyfrowana(): Promise<Baza> {
+  // Na Windowsie plik otwiera proces glowny: dostaje klucz, ustawia go
+  // PRAGMA key i sam sprawdza, czy plik da sie odczytac.
+  if (NA_WINDOWS) {
+    await most().baza.otworz(await kluczBazy());
+    return bazaWindows();
+  }
 
   // W przegladarce SQLite jest skompilowany do WebAssembly i nie ma w nim
-  // SQLCipher - PRAGMA key wywalilaby otwarcie bazy. Tryb podgladu dziala
-  // wiec bez szyfrowania, o czym aplikacja informuje paskiem na gorze ekranu.
-  if (!TRYB_PODGLADU) {
-    const klucz = await kluczBazy();
-    await db.execAsync(`PRAGMA key = "x'${klucz}'"`);
-  }
-  // Odczyt czegokolwiek udaje sie tylko przy poprawnym kluczu - to jest
-  // sprawdzenie, czy plik faktycznie da sie odszyfrowac.
+  // SQLCipher. Tryb podgladu dziala wiec bez szyfrowania, o czym aplikacja
+  // informuje paskiem na gorze ekranu.
+  const db = await SQLite.openDatabaseAsync(NAZWA_BAZY);
   await db.getFirstAsync('SELECT count(*) AS n FROM sqlite_master');
   return db;
 }
@@ -188,7 +195,7 @@ async function otworzZaszyfrowana(): Promise<SQLite.SQLiteDatabase> {
  * Rownolegle wywolania dostaja TO SAMO otwarcie - nigdy drugiego polaczenia
  * do tego samego pliku.
  */
-export async function otworzBaze(): Promise<SQLite.SQLiteDatabase> {
+export async function otworzBaze(): Promise<Baza> {
   if (polaczenie) return polaczenie;
   if (!otwieranie) {
     otwieranie = otworzIZmigruj().finally(() => { otwieranie = null; });
@@ -196,16 +203,17 @@ export async function otworzBaze(): Promise<SQLite.SQLiteDatabase> {
   return otwieranie;
 }
 
-async function otworzIZmigruj(): Promise<SQLite.SQLiteDatabase> {
-  let db: SQLite.SQLiteDatabase;
+async function otworzIZmigruj(): Promise<Baza> {
+  let db: Baza;
   try {
     db = await otworzZaszyfrowana();
   } catch {
-    // Plik jest nie do odczytania tym kluczem: zostal po starszej, nieszyfrowanej
-    // wersji aplikacji albo klucz zniknal z Keychain. Lokalna baza jest kopia
-    // robocza danych z serwera, wiec zakladamy ja od nowa i synchronizujemy.
-    // Niewyslane zmiany z takiej bazy i tak bylyby nieczytelne.
-    await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
+    // Plik jest nie do odczytania tym kluczem: zostal po starszej wersji
+    // aplikacji albo klucz zniknal z DPAPI (przeniesione konto Windows).
+    // Lokalna baza jest kopia robocza danych z serwera, wiec zakladamy ja od
+    // nowa i synchronizujemy. Niewyslane zmiany i tak bylyby nieczytelne.
+    if (NA_WINDOWS) await most().baza.skasuj().catch(() => undefined);
+    else await SQLite.deleteDatabaseAsync(NAZWA_BAZY).catch(() => undefined);
     db = await otworzZaszyfrowana();
   }
 
@@ -223,7 +231,7 @@ async function otworzIZmigruj(): Promise<SQLite.SQLiteDatabase> {
   return db;
 }
 
-export async function baza(): Promise<SQLite.SQLiteDatabase> {
+export async function baza(): Promise<Baza> {
   return polaczenie ?? otworzBaze();
 }
 
@@ -263,18 +271,18 @@ export async function pobierzMetaJson<T>(klucz: string, domyslna: T): Promise<T>
 /* ------------------------------ czyszczenie ---------------------------- */
 
 /**
- * A4 / A6 - calkowite skasowanie danych warsztatu z telefonu.
+ * A4 / A6 - calkowite skasowanie danych warsztatu z komputera.
  *
  * Wywolywane, gdy:
  *   - administrator zablokowal dostep albo kazal wyczyscic urzadzenie,
- *   - telefon nie synchronizowal sie dluzej niz okno offline warsztatu
- *     (skradziony telefon juz nigdy sie nie polaczy, wiec sam sie wyczysci),
+ *   - komputer nie synchronizowal sie dluzej niz okno offline warsztatu
+ *     (skradziony komputer juz nigdy sie nie polaczy, wiec sam sie wyczysci),
  *   - mechanik sie wylogowal,
  *   - ktos probowal zgadnac haslo zbyt wiele razy.
  *
  * Kolejka tez ginie - to swiadomy wybor. Jesli dostep zostal odebrany,
  * niewyslane zmiany nie maja juz gdzie trafic, a zostawienie ich na
- * telefonie oznaczaloby zostawienie danych osobowych klientow.
+ * komputerze oznaczaloby zostawienie danych osobowych klientow.
  */
 export async function wyczyscDaneWarsztatu(): Promise<void> {
   const db = await baza();

@@ -5,15 +5,15 @@
  * DOKLADNIE JEDEN - pilnuje tego indeks unikalny w bazie, a nie tylko ten
  * ekran. Ponad innych moze dokladnie tyle:
  *
- *   1. ZATWIERDZIC TELEFON czekajacy na dostep - jednym przyciskiem. Nie
+ *   1. ZATWIERDZIC STANOWISKO czekajace na dostep - jednym przyciskiem. Nie
  *      wpisuje ani jednego znaku: imie i nazwisko podal juz sam mechanik na
- *      swoim telefonie, a konto zaklada sie z tego imienia. Telefon zaraz
+ *      swoim komputerze, a konto zaklada sie z tego imienia. Program zaraz
  *      potem sam prosi mechanika o ustawienie wlasnego hasla.
- *   2. ODEBRAC DOSTEP - mechanikowi (wszystkie jego telefony) albo pojedynczemu
- *      telefonowi. Zablokowany telefon czysci lokalna baze przy najblizszym
- *      kontakcie z serwerem.
+ *   2. ODEBRAC DOSTEP - mechanikowi (wszystkie jego stanowiska) albo
+ *      pojedynczemu komputerowi. Zablokowane stanowisko czysci lokalna baze
+ *      przy najblizszym kontakcie z serwerem.
  *
- * Samego siebie zablokowac nie moze - ani swojego konta, ani telefonu,
+ * Samego siebie zablokowac nie moze - ani swojego konta, ani komputera,
  * na ktorym wlasnie stoi. Warsztat bez administratora nie mialby juz nikogo,
  * kto wpuscilby kogokolwiek z powrotem.
  *
@@ -67,7 +67,7 @@ export default function EkranAdministracji() {
   const wczytaj = useCallback(async (cichoBlad = false) => {
     try {
       const token = await pobierzToken();
-      if (!token) throw new BladSieci('Brak sesji na tym telefonie.');
+      if (!token) throw new BladSieci('Brak sesji na tym komputerze.');
       const odp = await daneAdmina(token);
       setDane(odp);
       if (!cichoBlad) setBlad(null);
@@ -83,7 +83,7 @@ export default function EkranAdministracji() {
 
   useFocusEffect(useCallback(() => { wczytaj(); }, [wczytaj]));
 
-  // Telefony zglaszaja sie w tle - lista odswieza sie sama, zeby administrator
+  // Stanowiska zglaszaja sie w tle - lista odswieza sie sama, zeby administrator
   // nie musial zgadywac, kiedy kod mechanika sie pojawi.
   useEffect(() => {
     const licznik = setInterval(() => wczytaj(true), 15_000);
@@ -100,7 +100,7 @@ export default function EkranAdministracji() {
     setSukces(null);
     try {
       const token = await pobierzToken();
-      if (!token) throw new BladSieci('Brak sesji na tym telefonie.');
+      if (!token) throw new BladSieci('Brak sesji na tym komputerze.');
       const wynik = await akcja(token);
       if (!wynik.ok) {
         setBlad(wynik.blad ?? 'Nie udalo sie wykonac tej operacji.');
@@ -122,7 +122,7 @@ export default function EkranAdministracji() {
   /** Jedyna czynnosc przy wpuszczaniu kogos do systemu: jedno dotkniecie. */
   const zatwierdz = useCallback((u: { kod: string; imie: string | null }) => wykonaj(
     (t) => zatwierdzUrzadzenie(t, u.kod),
-    `${u.imie ?? 'Telefon'} ma juz dostep. Telefon odbierze go w kilka sekund `
+    `${u.imie ?? 'Stanowisko'} ma juz dostep. Program odbierze go w kilka sekund `
       + 'i poprosi o ustawienie wlasnego hasla.',
   ), [wykonaj]);
 
@@ -175,7 +175,7 @@ export default function EkranAdministracji() {
       {/* ============ 1. ZATWIERDZANIE JEDNYM KLIKIEM ============ */}
       <Sekcja tytul="PROSBY O DOSTEP">
         <Text style={style.opis}>
-          Mechanik podaje na swoim telefonie imie i nazwisko i prosi o dostep.
+          Mechanik podaje na swoim komputerze imie i nazwisko i prosi o dostep.
           Ty tylko sprawdzasz, czy to rzeczywiscie ta osoba, i klikasz
           {' '}Zatwierdz. Konto zalozy sie samo.
         </Text>
@@ -184,10 +184,10 @@ export default function EkranAdministracji() {
           <View key={u.kod} style={style.oczekujace}>
             <View style={style.oczekujaceOpis}>
               <Text style={style.oczekujaceImie} numberOfLines={2}>
-                {u.imie ?? 'Telefon bez podanego imienia'}
+                {u.imie ?? 'Stanowisko bez podanego imienia'}
               </Text>
               <Text style={style.drobne} numberOfLines={2}>
-                {u.nazwa ?? 'telefon'} · {u.platforma ?? '?'}
+                {u.nazwa ?? 'komputer'} · {u.platforma ?? '?'}
                 {'\n'}prosba nr {u.kod} · {czasLokalny(u.zgloszone_o)}
               </Text>
             </View>
@@ -196,7 +196,7 @@ export default function EkranAdministracji() {
               onPress={() => zatwierdz(u)}
               disabled={zajety || !u.imie}
               accessibilityRole="button"
-              accessibilityLabel={`Zatwierdz dostep dla ${u.imie ?? 'tego telefonu'}`}
+              accessibilityLabel={`Zatwierdz dostep dla ${u.imie ?? 'tego stanowiska'}`}
               style={({ pressed }) => [
                 style.zatwierdz,
                 (zajety || !u.imie) && style.zatwierdzNieaktywny,
@@ -214,7 +214,7 @@ export default function EkranAdministracji() {
         )}
       </Sekcja>
 
-      {/* ============ 2. MECHANICY I ICH TELEFONY ============ */}
+      {/* ============ 2. MECHANICY I ICH STANOWISKA ============ */}
       <Sekcja tytul="MECHANICY">
         {(dane?.mechanicy ?? []).map((m) => (
           <View key={m.id} style={[style.karta, m.zablokowany_o && style.kartaZablokowana]}>
@@ -233,7 +233,7 @@ export default function EkranAdministracji() {
               {m.to_ja ? null : m.zablokowany_o ? (
                 <Pressable
                   onPress={() => wykonaj((t) => odblokujMechanika(t, m.id),
-                    'Dostep przywrocony. Telefon wroci do pracy bez ponownego parowania.')}
+                    'Dostep przywrocony. Stanowisko wroci do pracy bez ponownego parowania.')}
                   style={({ pressed }) => [style.maly, pressed && style.wcisniety]}
                 >
                   <Text style={style.malyTekst}>Przywroc</Text>
@@ -249,32 +249,32 @@ export default function EkranAdministracji() {
             </View>
 
             {m.urzadzenia.length === 0 ? (
-              <Text style={style.drobne}>Brak sparowanego telefonu.</Text>
+              <Text style={style.drobne}>Brak sparowanego stanowiska.</Text>
             ) : m.urzadzenia.map((u) => (
               <View key={u.id} style={style.urzadzenie}>
                 <Text style={style.drobne} numberOfLines={2}>
-                  {u.nazwa ?? 'telefon'} ({u.platforma ?? '?'}, {u.wersja ?? '?'})
+                  {u.nazwa ?? 'komputer'} ({u.platforma ?? '?'}, {u.wersja ?? '?'})
                   {'\n'}ostatnia synchronizacja: {czasLokalny(u.ostatnia_sync_o)}
-                  {u.zablokowane_o ? '\ntelefon zablokowany' : ''}
+                  {u.zablokowane_o ? '\nstanowisko zablokowane' : ''}
                   {u.czeka_na_haslo ? '\nczeka na ustawienie hasla' : ''}
                 </Text>
                 <View style={style.akcje}>
                   <Pressable
                     onPress={() => wykonaj((t) => akcjaNaUrzadzeniu(t, u.id, 'reset_hasla'),
-                      'Przy najblizszym uruchomieniu telefon poprosi o nowe haslo.')}
+                      'Przy najblizszym uruchomieniu program poprosi o nowe haslo.')}
                     style={({ pressed }) => [style.maly, pressed && style.wcisniety]}
                   >
                     <Text style={style.malyTekst}>Nowe haslo</Text>
                   </Pressable>
 
-                  {/* Na wlasnym telefonie nie ma czego odcinac - administrator
+                  {/* Na wlasnym stanowisku nie ma czego odcinac - administrator
                       odcialby sam siebie od jedynego miejsca, z ktorego mozna
                       komukolwiek przywrocic dostep. Serwer odmawia tego tak
                       samo; tu po prostu nie pokazujemy pulapki. */}
                   {m.to_ja ? null : u.zablokowane_o ? (
                     <Pressable
                       onPress={() => wykonaj((t) => akcjaNaUrzadzeniu(t, u.id, 'odblokuj'),
-                        'Telefon odblokowany.')}
+                        'Stanowisko odblokowane.')}
                       style={({ pressed }) => [style.maly, pressed && style.wcisniety]}
                     >
                       <Text style={style.malyTekst}>Odblokuj</Text>
@@ -282,7 +282,7 @@ export default function EkranAdministracji() {
                   ) : (
                     <Pressable
                       onPress={() => wykonaj((t) => akcjaNaUrzadzeniu(t, u.id, 'zablokuj'),
-                        'Telefon zablokowany. Wyczysci dane przy najblizszym polaczeniu.')}
+                        'Stanowisko zablokowane. Wyczysci dane przy najblizszym polaczeniu.')}
                       style={({ pressed }) => [style.maly, style.malyZly, pressed && style.wcisniety]}
                     >
                       <Text style={[style.malyTekst, style.malyTekstZly]}>Zablokuj</Text>
@@ -321,12 +321,12 @@ export default function EkranAdministracji() {
           widoczne
           tytul={pytanie.rodzaj === 'zablokuj_mechanika'
             ? 'Odebrac dostep?'
-            : 'Wyrejestrowac telefon?'}
+            : 'Wyrejestrowac stanowisko?'}
           tresc={pytanie.rodzaj === 'zablokuj_mechanika'
-            ? `${pytanie.mechanik.imie} straci dostep natychmiast. Wszystkie jego telefony `
+            ? `${pytanie.mechanik.imie} straci dostep natychmiast. Wszystkie jego stanowiska `
               + 'skasuja dane warsztatu przy najblizszym polaczeniu z internetem. '
               + 'Dostep mozna pozniej przywrocic.'
-            : `Telefon ${pytanie.urzadzenie.nazwa ?? ''} zostanie odciety na stale i skasuje `
+            : `Stanowisko ${pytanie.urzadzenie.nazwa ?? ''} zostanie odciete na stale i skasuje `
               + 'dane. Zeby wrocic do pracy, bedzie musial przejsc parowanie od nowa.'}
           tekstAkcji={pytanie.rodzaj === 'zablokuj_mechanika' ? 'Odbierz dostep' : 'Wyrejestruj'}
           tekstAnuluj="Anuluj"
@@ -340,7 +340,7 @@ export default function EkranAdministracji() {
                 'Dostep odebrany.');
             } else {
               await wykonaj((t) => akcjaNaUrzadzeniu(t, p.urzadzenie.id, 'wyrejestruj'),
-                'Telefon wyrejestrowany.');
+                'Stanowisko wyrejestrowane.');
             }
           }}
           onAnuluj={() => setPytanie(null)}

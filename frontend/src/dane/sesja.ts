@@ -7,23 +7,22 @@
  *  2. Administrator w panelu przypisuje ten kod do konkretnego mechanika.
  *     To jest ten "zdalny, jednorazowy dostep bez hasla" - mechanik nie
  *     wpisuje zadnego hasla do systemu, bo takiego hasla po prostu nie ma.
- *  3. Telefon odbiera token urzadzenia i prosi mechanika o ustawienie
+ *  3. Program odbiera token urzadzenia i prosi mechanika o ustawienie
  *     DOWOLNEGO wlasnego hasla. Moze byc krotkie - to blokada aplikacji,
  *     a nie haslo do bazy.
- *  4. Od tej pory mechanik wchodzi tym haslem albo odciskiem palca.
+ *  4. Od tej pory mechanik wchodzi tym haslem.
  *  5. Administrator moze w kazdej chwili odebrac dostep albo kazac ustawic
  *     nowe haslo - jednym przyciskiem w panelu.
  *
  * D1 - Token urzadzenia NIE MA daty waznosci i nie jest odswiezany.
  *      Brak sieci nie moze nikogo wylogowac. Sesje uniewaznia wylacznie
  *      administrator.
- * A4 - Token i weryfikator hasla leza w Keychain / Keystore, oznaczone jako
- *      "tylko to urzadzenie" - nie da sie ich przeniesc kopia zapasowa.
- * A5 - Aplikacja blokuje sie sama po 5 minutach bezczynnosci i po przejsciu
- *      w tlo. Nie polegamy na blokadzie systemowej telefonu.
+ * A4 - Token i weryfikator hasla leza w DPAPI Windows, przypisane do tego
+ *      konta i tego komputera - skopiowane na inny komputer sa nieczytelne.
+ * A5 - Aplikacja blokuje sie sama po 5 minutach bezczynnosci i po zejsciu
+ *      okna w tlo. Nie polegamy na blokadzie ekranu Windows.
  */
 import * as Crypto from 'expo-crypto';
-import * as LocalAuthentication from 'expo-local-authentication';
 
 import { czytaj, skasuj, zapisz } from './pamiecBezpieczna';
 
@@ -80,7 +79,7 @@ export async function zapiszDostep(dane: {
 
   await ustawMeta('mechanik_id', dane.mechanik.id);
   await ustawMeta('mechanik_imie', dane.mechanik.imie);
-  // Rola decyduje o tym, czy telefon pokaze ekran zarzadzania dostepem.
+  // Rola decyduje o tym, czy komputer pokaze ekran zarzadzania dostepem.
   // Jest odswiezana przy kazdej synchronizacji, wiec odebranie uprawnien
   // administratora dziala od razu.
   await ustawMeta('rola', dane.mechanik.rola ?? 'mechanik');
@@ -104,10 +103,10 @@ export async function daneMechanika() {
 /**
  * Weryfikator hasla liczony lancuchem SHA-256 z 32-bajtowa sola.
  *
- * Dlaczego to wystarcza: weryfikator nigdy nie opuszcza Keychain/Keystore,
- * a wiec zeby go zaatakowac, trzeba juz miec zlamany telefon. Liczba prob
- * jest ograniczona - po MAKS_PROB_HASLA nieudanych probach aplikacja kasuje
- * cala lokalna baze. Haslo nie chroni bazy w chmurze - tam dziala token
+ * Dlaczego to wystarcza: weryfikator lezy w DPAPI, a wiec zeby go zaatakowac,
+ * trzeba juz byc zalogowanym na to konto Windows. Liczba prob jest
+ * ograniczona - po MAKS_PROB_HASLA nieudanych probach aplikacja kasuje cala
+ * lokalna baze. Haslo nie chroni bazy w chmurze - tam dziala token
  * urzadzenia, ktory administrator moze uniewaznic z panelu.
  */
 const RUNDY = 500;
@@ -165,34 +164,10 @@ export async function pozostaleProby(): Promise<number> {
   return Math.max(0, MAKS_PROB_HASLA - proby);
 }
 
-/* ------------------------------ biometria ------------------------------ */
-
-export async function biometriaDostepna(): Promise<boolean> {
-  try {
-    return (await LocalAuthentication.hasHardwareAsync())
-      && (await LocalAuthentication.isEnrolledAsync());
-  } catch {
-    return false;
-  }
-}
-
-export async function odblokujBiometria(): Promise<boolean> {
-  try {
-    const wynik = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Odblokuj aplikacje warsztatu',
-      cancelLabel: 'Uzyj hasla',
-      disableDeviceFallback: false,
-    });
-    return wynik.success;
-  } catch {
-    return false;
-  }
-}
-
 /* ------------------------------ czyszczenie ---------------------------- */
 
 /**
- * A4 / A6 - usuwa z telefonu wszystko: token, haslo i cala lokalna baze.
+ * A4 / A6 - usuwa z komputera wszystko: token, haslo i cala lokalna baze.
  * Po tym aplikacja wraca do ekranu parowania.
  */
 export async function wyczyscWszystko(): Promise<void> {

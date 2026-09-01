@@ -1,7 +1,7 @@
 # =====================================================================
 #  A1 - TEST PRAKTYCZNY: co widzi klucz wbudowany w aplikacje mobilna?
 #
-#  Klucz anon jest publiczny z zalozenia - siedzi w paczce .apk/.ipa,
+#  Klucz anon jest publiczny z zalozenia - siedzi w paczce programu,
 #  ktora kazdy rozpakuje w kilka minut. Ten test sprawdza, czy z samym
 #  tym kluczem, bez logowania, da sie cokolwiek odczytac z bazy.
 #

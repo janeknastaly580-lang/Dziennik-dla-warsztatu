@@ -15,7 +15,7 @@ nie ma PowerSync, nie ma osobnego magazynu zdjęć — bo **nie ma zdjęć**.
 |---|---|---|---|---|
 | **Supabase Inc.** | Baza danych klientów i zleceń, funkcje serwerowe, logi | eu-central-1 (Frankfurt, AWS) | <https://supabase.com/legal/dpa> | ☐ do podpisania |
 | `[biuro rachunkowe]` | Dane z faktur | `[…]` | umowa własna | ☐ |
-| `[operator telefonii — jeśli SMS-y do klientów]` | Numery telefonów | `[…]` | umowa własna | ☐ |
+| `[operator komputerii — jeśli SMS-y do klientów]` | Numery komputerów | `[…]` | umowa własna | ☐ |
 
 **Sub‑procesorzy Supabase** (informacyjnie, akceptujesz ich razem z DPA):
 Amazon Web Services (infrastruktura), Cloudflare (warstwa sieciowa dostawcy),

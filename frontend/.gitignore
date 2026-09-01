@@ -38,6 +38,5 @@ yarn-error.*
 
 example
 
-# generated native folders
-/ios
-/android
+# zbudowane ekrany dla programu Windows
+/dist

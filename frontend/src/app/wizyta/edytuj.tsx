@@ -2,7 +2,7 @@
  * Edycja zgloszenia.
  *
  * B1 - do kolejki trafiaja WYLACZNIE zmienione kolumny. Poprawka opisu nie
- *      cofnie statusu, ktory w tym czasie ustawil kolega z drugiego telefonu.
+ *      cofnie statusu, ktory w tym czasie ustawil kolega z drugiego komputera.
  *
  * Statusu NIE zmienia sie tutaj - od tego sa trzy duze przyciski na ekranie
  * zgloszenia. Tu poprawia sie tresc: auto, tytul, opis, priorytet, termin,
@@ -77,7 +77,7 @@ export default function EkranEdycjiWizyty() {
     pobierzWizyte(wizytaId).then((w) => {
       if (!aktywny) return;
       if (!w) {
-        setBlad('Nie znaleziono tego zgloszenia na telefonie.');
+        setBlad('Nie znaleziono tego zgloszenia na komputerze.');
         return;
       }
       const dane: Wartosci = {

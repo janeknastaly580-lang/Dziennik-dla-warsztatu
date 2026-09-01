@@ -1,14 +1,14 @@
 /**
  * Konfiguracja Metro.
  *
- * Jedyny powod, dla ktorego ten plik istnieje: wersja WEBOWA aplikacji.
- * `expo-sqlite` uruchamia w przegladarce SQLite skompilowany do WebAssembly
- * i importuje plik `.wasm`, ktorego Metro domyslnie nie zna (sprawdzone:
- * `wasm` nie ma w domyslnym `assetExts`). Bez tej linijki wejscie na
- * localhost konczy sie bledem
- * "Unable to resolve module ./wa-sqlite/wa-sqlite.wasm".
+ * Jedyny powod, dla ktorego ten plik istnieje: PODGLAD W PRZEGLADARCE.
+ * `expo-sqlite` uruchamia tam SQLite skompilowany do WebAssembly i importuje
+ * plik `.wasm`, ktorego Metro domyslnie nie zna (sprawdzone: `wasm` nie ma
+ * w domyslnym `assetExts`). Bez tej linijki wejscie na localhost konczy sie
+ * bledem "Unable to resolve module ./wa-sqlite/wa-sqlite.wasm".
  *
- * Do buildu APK / IPA ten plik nie jest potrzebny - tam SQLite jest natywny.
+ * W gotowym programie Windows ten SQLite nie jest uzywany: baze otwiera
+ * proces glowny przez SQLCipher (patrz `windows/glowny.js`).
  *
  * CZEGO TU CELOWO NIE MA: naglowkow Cross-Origin-Opener-Policy /
  * Cross-Origin-Embedder-Policy. Byly tu wczesniej, ustawiane przez

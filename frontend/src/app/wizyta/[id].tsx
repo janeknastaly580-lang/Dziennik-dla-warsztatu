@@ -5,9 +5,9 @@
  * kafelka w historii) i usunac zgloszenie.
  *
  * NIE MA TU ZDJEC. System swiadomie nie przechowuje fotografii - ani na
- * telefonie, ani w chmurze. Znika przez to caly lancuch ryzyk: metadane GPS
+ * komputerze, ani w chmurze. Znika przez to caly lancuch ryzyk: metadane GPS
  * i wizerunki osob w tle (A7), publiczny magazyn plikow i wyciekajace adresy
- * (A8), rozjazd miedzy baza a magazynem (B7), zapchana pamiec telefonu (D6)
+ * (A8), rozjazd miedzy baza a magazynem (B7), zapchana pamiec komputera (D6)
  * i zalanie lacza po powrocie sieci (D7). Opis tekstowy wystarcza.
  *
  * B1 - zmiana statusu wysyla na serwer WYLACZNIE kolumne `status`.
@@ -109,9 +109,9 @@ export default function EkranWizyty() {
     return (
       <View style={style.ekran}>
         <KomunikatBledu
-          tresc={'Nie ma tego zgloszenia na telefonie. Moglo zostac usuniete albo '
+          tresc={'Nie ma tego zgloszenia na komputerze. Moglo zostac usuniete albo '
             + 'wypasc z okna synchronizacji (starsze naprawione zgloszenia nie sa '
-            + 'trzymane na telefonie).'}
+            + 'trzymane na komputerze).'}
           onPonow={odswiez}
         />
       </View>
@@ -219,6 +219,16 @@ export default function EkranWizyty() {
             wartosc={wizyta.numer_oficjalny ?? 'zostanie nadany przy synchronizacji'}
           />
         </View>
+
+        {termin ? (
+          <Przycisk
+            tytul="Pokaz w kalendarzu"
+            wariant="drugi"
+            onPress={() => router.push(
+              `/kalendarz?data=${termin.data}&wizyta=${wizyta.id}`,
+            )}
+          />
+        ) : null}
 
         <Przycisk
           tytul="Edytuj zgloszenie"

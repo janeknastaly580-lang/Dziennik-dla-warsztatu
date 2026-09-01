@@ -1,10 +1,11 @@
 /**
  * Wspolna oprawa kazdego formularza w aplikacji.
  *
- * PROBLEM, KTORY ROZWIAZUJE: na Androidzie klawiatura zasłaniala dolne pola.
- * `KeyboardAvoidingView` z gołego React Native radzi sobie z tym slabo, gdy
- * ekran jest przewijany i ma kilka pol - a wszystkie formularze warsztatu
- * takie wlasnie sa (klient ma szesc pol, wizyta cztery).
+ * PROBLEM, KTORY ROZWIAZUJE: formularz ma byc przewijalny i sam dosuwac do
+ * widoku pole, ktore wlasnie dostalo kursor - a wszystkie formularze warsztatu
+ * sa dlugie (klient ma szesc pol, wizyta piec). Na komputerze z klawiatura
+ * ekranowa (laptop 2w1, tablet z Windows) dziala tez to, po co ta biblioteka
+ * powstala: tresc podnosi sie o wysokosc klawiatury.
  *
  * `KeyboardAwareScrollView` z `react-native-keyboard-controller`:
  *   - podnosi zawartosc dokladnie o wysokosc klawiatury,
@@ -12,8 +13,8 @@
  *   - zostawia ekran normalnie przewijalny palcem,
  *   - animuje sie rownolegle z klawiatura, wiec nie ma przeskoku.
  *
- * Biblioteka jest w Expo SDK 54+ dostepna takze w Expo Go, ale wymaga
- * `KeyboardProvider` na samej gorze drzewa - jest w `app/_layout.tsx`.
+ * Biblioteka wymaga `KeyboardProvider` na samej gorze drzewa - jest
+ * w `app/_layout.tsx`.
  *
  * `bottomOffset` to zapas pod aktywnym polem: bez niego pole ląduje tuz przy
  * krawedzi klawiatury i nie widac ani etykiety bledu, ani przycisku.

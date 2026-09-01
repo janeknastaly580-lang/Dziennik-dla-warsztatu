@@ -7,9 +7,9 @@ narzedzia/.env
 .env.local
 
 # WYJATEK: frontend/.env trzyma WYLACZNIE zmienne EXPO_PUBLIC_*, ktore Expo
-# i tak wkleja na stale do paczki .apk / .ipa. Sa publiczne z definicji, wiec
-# ukrywanie ich niczego nie chroni, a ich brak w repozytorium zepsulby build
-# w chmurze EAS. app.config.js przerywa build, jesli trafi tam sekret.
+# i tak wkleja na stale do zbudowanych ekranow. Sa publiczne z definicji, wiec
+# ukrywanie ich niczego nie chroni, a ich brak w repozytorium zepsulby
+# budowanie programu. app.config.js przerywa build, jesli trafi tam sekret.
 !frontend/.env
 !frontend/.env.example
 
@@ -23,12 +23,14 @@ dane/*.db-shm
 dane/pliki/*
 !dane/pliki/.gitkeep
 
-# Expo
+# Expo - zbudowane ekrany dla programu Windows
 frontend/.expo/
 frontend/dist/
 frontend/expo-env.d.ts
-frontend/android/
-frontend/ios/
+
+# program Windows: pobrany Electron i gotowe instalatory
+windows/node_modules/
+windows/dist/
 
 # systemowe
 .DS_Store

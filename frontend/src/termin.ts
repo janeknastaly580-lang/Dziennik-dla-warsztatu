@@ -3,7 +3,7 @@
  *
  * Godziny trzymamy jako tekst 'HH:MM', dokladnie tak jak date trzymamy jako
  * 'YYYY-MM-DD': sortuje sie samo, nie ma stref czasowych i nie przesuwa sie
- * po zmianie ustawien telefonu. Serwer ma te kolumny jako `time`, wiec
+ * po zmianie ustawien komputera. Serwer ma te kolumny jako `time`, wiec
  * z synchronizacji wracaja z sekundami ('08:00:00') - `naMinuty` to znosi.
  *
  * Caly ruch po siatce kalendarza chodzi w minutach od polnocy; tekst
@@ -110,6 +110,63 @@ export function etykietaKrotka(data: string): string {
   const d = naDate(data);
   return `${DNI[d.getDay()]} ${d.getDate()}.${dwie(d.getMonth() + 1)}`;
 }
+
+/* --------------------------- siatka miesiaca -------------------------- */
+
+/** Skroty dni od PONIEDZIALKU - tak uklada sie kalendarz w Polsce. */
+export const DNI_TYGODNIA = ['pon', 'wt', 'sr', 'czw', 'pt', 'sob', 'nd'];
+
+const MIESIACE_MIANOWNIK = ['styczen', 'luty', 'marzec', 'kwiecien', 'maj', 'czerwiec',
+  'lipiec', 'sierpien', 'wrzesien', 'pazdziernik', 'listopad', 'grudzien'];
+
+/** '2026-09-02' -> 'wrzesien 2026' */
+export function etykietaMiesiaca(data: string): string {
+  const d = naDate(data);
+  return `${MIESIACE_MIANOWNIK[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * Miesiac w przod lub w tyl. Dzien miesiaca jest przycinany do dlugosci
+ * nowego miesiaca - bez tego 31 stycznia po cofnieciu o miesiac wyladowaloby
+ * w marcu (`Date` przewija nadmiarowe dni na nastepny miesiac).
+ */
+export function przesunMiesiac(data: string, oMiesiecy: number): string {
+  const d = naDate(data);
+  const dzien = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + oMiesiecy);
+  const dlugoscMiesiaca = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dzien, dlugoscMiesiaca));
+  return naTekstDaty(d);
+}
+
+/**
+ * 42 dni (6 tygodni) zaczynajac od poniedzialku tygodnia, w ktorym wypada
+ * pierwszy dzien miesiaca. Stala liczba pol znaczy, ze siatka nie skacze
+ * przy przewijaniu miesiecy.
+ */
+export function siatkaMiesiaca(data: string): string[] {
+  const pierwszy = naDate(data);
+  pierwszy.setDate(1);
+  // getDay(): 0 = niedziela. Chcemy 0 = poniedzialek.
+  const przesuniecie = (pierwszy.getDay() + 6) % 7;
+  const start = new Date(pierwszy);
+  start.setDate(1 - przesuniecie);
+
+  const dni: string[] = [];
+  for (let i = 0; i < 42; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dni.push(naTekstDaty(d));
+  }
+  return dni;
+}
+
+export const tenSamMiesiac = (a: string, b: string): boolean =>
+  a.slice(0, 7) === b.slice(0, 7);
+
+/** Numer dnia do wpisania w kratke siatki miesiaca. */
+export const dzienMiesiaca = (data: string): number => naDate(data).getDate();
 
 /** 'Dzis' / 'Jutro' / 'Wczoraj' - albo nic, gdy dzien jest dalej. */
 export function wzgledemDzis(data: string): string | null {

@@ -3,7 +3,7 @@
  *
  * B1 - do kolejki trafiaja WYLACZNIE pola, ktore mechanik faktycznie zmienil.
  *      Poprawka numeru telefonu nie cofnie notatki dopisanej w tym samym
- *      czasie przez kolege z drugiego telefonu.
+ *      czasie przez kolege z drugiego komputera.
  *
  * Przed zapisem pojawia sie pytanie "czy na pewno" z wypisanymi zmianami -
  * mechanik widzi czarno na bialym, co przed chwila poprawil i na co.
@@ -52,7 +52,7 @@ export default function EkranEdycjiKlienta() {
     profilKlienta(klientId).then((k) => {
       if (!aktywny) return;
       if (!k) {
-        setBlad('Nie znaleziono tej kartoteki na telefonie.');
+        setBlad('Nie znaleziono tej kartoteki na komputerze.');
         return;
       }
       const dane: Wartosci = {

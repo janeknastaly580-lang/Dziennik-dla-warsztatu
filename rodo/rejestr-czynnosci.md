@@ -46,7 +46,7 @@
 | **Cel** | Kontrola dostępu do danych klientów i możliwość odtworzenia, kto miał wgląd w daną kartotekę |
 | **Podstawa prawna** | art. 6 ust. 1 lit. f RODO (prawnie uzasadniony interes: bezpieczeństwo danych powierzonych warsztatowi) |
 | **Kategorie osób** | Mechanicy i personel warsztatu |
-| **Kategorie danych** | Imię i nazwisko mechanika, identyfikator urządzenia, model telefonu i wersja aplikacji, znaczniki czasu logowania i otwierania kartotek |
+| **Kategorie danych** | Imię i nazwisko mechanika, identyfikator urządzenia, model komputera i wersja aplikacji, znaczniki czasu logowania i otwierania kartotek |
 | **Odbiorcy** | Supabase (hosting) |
 | **Termin usunięcia** | Dziennik dostępu: 12 miesięcy. Dziennik działań administratora: 24 miesiące. Kasowane automatycznie. |
 
@@ -67,9 +67,9 @@
   urządzenia; token przyznaje imiennie administrator i może go odebrać zdalnie.
 - Blokada aplikacji hasłem lub biometrią, automatyczna po 5 minutach
   bezczynności i przy przejściu w tło.
-- Telefon bez kontaktu z serwerem przez `[14]` dni kasuje lokalną kopię danych.
+- Komputer bez kontaktu z serwerem przez `[14]` dni kasuje lokalną kopię danych.
 - Wyłączone kopie zapasowe aplikacji do iCloud i Google Drive.
-- Ograniczenie zakresu danych na telefonie do `[90]` dni historii oraz zleceń
+- Ograniczenie zakresu danych na komputerze do `[90]` dni historii oraz zleceń
   otwartych.
 - Rejestr dostępu do kartotek (kto, kiedy, którą otworzył).
 - Brak funkcji masowego eksportu danych w aplikacji mobilnej.
@@ -82,7 +82,7 @@
 - Upoważnienia do przetwarzania danych dla mechaników — `[data nadania]`
 - Umowy o zachowaniu poufności — `[data podpisania]`
 - Procedura offboardingu: blokada konta w panelu **w dniu zakończenia pracy**
-- Telefony służbowe z wymuszonym kodem blokady ekranu
+- Komputery służbowe z wymuszonym kodem blokady ekranu
 - Szkolenie: nie wynosimy danych, nie robimy zdjęć kartotek, nie przesyłamy
   danych klientów prywatnymi komunikatorami
 

@@ -3,27 +3,27 @@
  *
  * Mechanik nie zna i nie wpisuje zadnego hasla do systemu. Podaje TYLKO
  * swoje imie i nazwisko i prosi o dostep. Na liscie administratora pojawia
- * sie gotowy wiersz - imie, nazwisko i kod tego telefonu - a administrator
+ * sie gotowy wiersz - imie, nazwisko i kod tego komputera - a administrator
  * klika "Zatwierdz". Nie wpisuje ani jednego znaku i nie musi wiedziec,
  * jak pisze sie czyjes nazwisko. Konto zaklada sie samo.
  *
- * Telefon odbiera dostep w ciagu kilku sekund i dopiero wtedy prosi
+ * Program odbiera dostep w ciagu kilku sekund i dopiero wtedy prosi
  * o ustawienie WLASNEGO hasla do blokady aplikacji.
  *
  * Ani kod, ani imie nie sa sekretem - same z siebie nic nie daja. Dostep
- * przyznaje administrator, a token odbiera wylacznie ten telefon, ktory ma
- * sekret zapisany w Keychain / Keystore.
+ * przyznaje administrator, a token odbiera wylacznie ten komputer, ktory ma
+ * sekret zapisany w DPAPI Windows.
  *
  * D2 - To jedyny moment, w ktorym internet jest konieczny. Wdrazaj
  *      mechanikow przy dzialajacym laczu.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import * as Device from 'expo-device';
 
 import { Pole, Przycisk } from './Formularz';
+import { MOST } from '../dane/mostWindows';
 import { aktywujZaproszenie, sprawdzZgode, zglosUrzadzenie, BladSieci } from '../dane/chmura';
 import {
   pobierzZgloszenie, zapiszDostep, zapiszZgloszenie, ZgloszenieParowania,
@@ -35,6 +35,22 @@ import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
 import { s, wys } from '../uklad';
 
 const OKRES_ODPYTANIA_MS = 5000;
+
+/**
+ * Nazwa, pod ktora administrator zobaczy to stanowisko na swojej liscie.
+ * Bierzemy nazwe komputera z Windowsa - mechanik nie musi jej wymyslac,
+ * a administrator poznaje po niej stanowisko w warsztacie.
+ */
+async function nazwaStanowiska(): Promise<string> {
+  try {
+    const opis = await MOST?.system.opis();
+    const nazwa = [opis?.nazwa, opis?.uzytkownik].filter(Boolean).join(' · ');
+    if (nazwa) return nazwa;
+  } catch {
+    // Brak nazwy nie moze zablokowac parowania.
+  }
+  return 'komputer w warsztacie';
+}
 
 export default function EkranParowania() {
   const { odswiezFaze, sync } = useAplikacja();
@@ -70,10 +86,10 @@ export default function EkranParowania() {
     setZajety(true);
     setBlad(null);
     try {
-      const nazwa = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ')
-        || `telefon ${Platform.OS}`;
       const nowe = await zglosUrzadzenie({
-        platforma: Platform.OS, nazwa_urzadzenia: nazwa, imie: czysteImie,
+        platforma: 'windows',
+        nazwa_urzadzenia: await nazwaStanowiska(),
+        imie: czysteImie,
       });
       // Imie trzymamy takze u siebie - zeby po ponownym otwarciu aplikacji
       // bylo widac, o kogo prosbe wyslano.
@@ -96,7 +112,7 @@ export default function EkranParowania() {
   }, []);
 
   /* ------------------------ kod zaproszenia ----------------------------- */
-  /* Pierwszy telefon w warsztacie nie ma kogo poprosic o zgode - dostaje
+  /* Pierwszy komputer w warsztacie nie ma kogo poprosic o zgode - dostaje
      kod zaproszenia od dostawcy uslugi. Zaklada nim warsztat i wlasne konto
      administratora, a potem sam zatwierdza pozostalych mechanikow. */
   const uzyjZaproszenia = useCallback(async () => {
@@ -105,11 +121,9 @@ export default function EkranParowania() {
     setBlad(null);
     try {
       if (!biezace) {
-        const nazwa = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ')
-          || `telefon ${Platform.OS}`;
         biezace = await zglosUrzadzenie({
-          platforma: Platform.OS,
-          nazwa_urzadzenia: nazwa,
+          platforma: 'windows',
+          nazwa_urzadzenia: await nazwaStanowiska(),
           // Przy kodzie zaproszenia imie i tak bierze sie z samego kodu.
           imie: imie.trim(),
         });
@@ -205,10 +219,10 @@ export default function EkranParowania() {
           <Text style={style.tytulOdciecia}>Dostep zostal odebrany</Text>
           <Text style={style.tresc}>
             {sync.odciecie.powod
-              ?? 'Administrator zablokowal dostep tego telefonu do danych warsztatu.'}
+              ?? 'Administrator zablokowal dostep tego komputera do danych warsztatu.'}
           </Text>
           <Text style={[style.tresc, style.drobne]}>
-            Dane warsztatu zostaly skasowane z tego telefonu. Zeby wrocic do pracy,
+            Dane warsztatu zostaly skasowane z tego komputera. Zeby wrocic do pracy,
             popros administratora o ponowne przyznanie dostepu.
           </Text>
         </View>
@@ -218,7 +232,7 @@ export default function EkranParowania() {
         <Text style={style.tytul}>Dostep do aplikacji</Text>
         <Text style={style.tresc}>
           Nie ma tu zadnego hasla do wpisania. Podaj swoje imie i nazwisko
-          i popros o dostep - administrator warsztatu zatwierdzi Twoj telefon
+          i popros o dostep - administrator warsztatu zatwierdzi to stanowisko
           jednym klikniciem. Potem ustawisz wlasne haslo.
         </Text>
 
@@ -280,7 +294,7 @@ export default function EkranParowania() {
         {blad ? <Text style={style.blad}>{blad}</Text> : null}
       </View>
 
-      {/* Druga droga wejscia: pierwszy telefon w warsztacie. Nie ma jeszcze
+      {/* Druga droga wejscia: pierwszy komputer w warsztacie. Nie ma jeszcze
           administratora, ktory by go zatwierdzil, wiec zaklada warsztat
           kodem zaproszenia otrzymanym od dostawcy uslugi. */}
       <View style={style.karta}>
@@ -362,7 +376,7 @@ const style = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: s(1),
     color: Kolory.tekstDrugi,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: 'Consolas, monospace',
   },
   oczekiwanie: { flexDirection: 'row', alignItems: 'center', gap: Odstepy.s, marginBottom: Odstepy.m },
   oczekiwanieTekst: { fontSize: s(13.5), color: Kolory.tekstDrugi, fontWeight: '600' },

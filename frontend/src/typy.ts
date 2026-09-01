@@ -1,12 +1,12 @@
 /**
  * Typy danych aplikacji.
  *
- * Identyfikatory sa tekstowymi UUID nadawanymi na telefonie (B5, B12) -
+ * Identyfikatory sa tekstowymi UUID nadawanymi na komputerze (B5, B12) -
  * ten sam identyfikator jedzie na serwer przy kazdym ponowieniu wysylki,
  * wiec zaden zapis nie zdubluje sie w bazie.
  *
  * Nie ma tu typu "Plik". System swiadomie nie przechowuje zdjec ani
- * zalacznikow - ani na telefonie, ani w chmurze.
+ * zalacznikow - ani na komputerze, ani w chmurze.
  */
 
 export type Status = 'nienaprawione' | 'w_trakcie' | 'naprawione';
@@ -81,7 +81,7 @@ export type Wizyta = {
   naprawione_o: string | null;
   przebieg: number | null;
   koszt: number | null;
-  /** B5: numer nadany na telefonie (widoczny od razu). */
+  /** B5: numer nadany na komputerze (widoczny od razu). */
   numer_roboczy: string | null;
   /** B5: numer nadany przez serwer przy synchronizacji. */
   numer_oficjalny: string | null;

@@ -2,7 +2,7 @@
  * Formularz nowego klienta.
  *
  * B3 - zanim zalozymy kartoteke, sprawdzamy w lokalnej bazie, czy ktos juz nie
- *      ma tego numeru telefonu. Dwa telefony pracujace bez sieci moga zalozyc
+ *      ma tego numeru telefonu. Dwa komputery pracujace bez sieci moga zalozyc
  *      te sama kartoteke i NIC sie nie nadpisze - wiec system nie zglosi bledu.
  *      Dlatego ostrzezenie musi paść tutaj, zanim duplikat powstanie.
  *

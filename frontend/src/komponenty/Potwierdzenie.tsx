@@ -5,12 +5,11 @@
  * `Alert.alert()` jest pusta funkcja, wiec w przegladarce nie pokazywaloby
  * sie nic i przyciski (np. "Usun zgloszenie") sprawialy wrazenie zepsutych.
  *
- * To okno jest zwyklym nakladanym widokiem, wiec dziala tak samo na iOS,
- * Androidzie i w przegladarce. Nie uzywamy tez komponentu `Modal`, bo na
- * webie renderuje sie on poza ramka telefonu.
+ * To okno jest zwyklym nakladanym widokiem. Nie uzywamy tez komponentu
+ * `Modal`, bo renderuje sie on poza kolumna tresci.
  */
 import React, { useEffect } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Przycisk } from './Formularz';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
@@ -34,14 +33,14 @@ export default function Potwierdzenie({
   widoczne, tytul, tresc, tekstAkcji = 'OK', tekstAnuluj,
   wariant = 'glowny', zajety, onAkcja, onAnuluj,
 }: Props) {
-  // Sprzetowy przycisk "wstecz" na Androidzie zamyka okno zamiast ekranu.
+  // Escape zamyka okno - tego odruchu uzywa kazdy program na Windowsie.
   useEffect(() => {
-    if (!widoczne || Platform.OS !== 'android') return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!zajety) onAnuluj();
-      return true;
-    });
-    return () => sub.remove();
+    if (!widoczne || typeof window === 'undefined') return;
+    const naKlawisz = (zdarzenie: KeyboardEvent) => {
+      if (zdarzenie.key === 'Escape' && !zajety) onAnuluj();
+    };
+    window.addEventListener('keydown', naKlawisz);
+    return () => window.removeEventListener('keydown', naKlawisz);
   }, [widoczne, zajety, onAnuluj]);
 
   if (!widoczne) return null;

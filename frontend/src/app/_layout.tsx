@@ -4,12 +4,12 @@
  * Zanim mechanik zobaczy jakiekolwiek dane klientow, aplikacja ustala,
  * w ktorej fazie jest to urzadzenie:
  *
- *   parowanie    - telefon nie ma jeszcze dostepu; pokazuje kod dla administratora
+ *   parowanie    - komputer nie ma jeszcze dostepu; pokazuje kod dla administratora
  *   ustaw_haslo  - dostep przyznany; mechanik wybiera wlasne haslo
  *   zablokowana  - haslo jest, trzeba je podac (A5)
  *   gotowa       - normalna praca
  *
- * D1: o fazie decyduje WYLACZNIE zawartosc telefonu. Brak sieci nigdy nie
+ * D1: o fazie decyduje WYLACZNIE zawartosc dysku. Brak sieci nigdy nie
  *     przelaczy mechanika na ekran logowania.
  */
 import React from 'react';
@@ -19,7 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-import RamkaTelefonu from '../komponenty/RamkaTelefonu';
+import KolumnaEkranu from '../komponenty/KolumnaEkranu';
 import EkranParowania from '../komponenty/EkranParowania';
 import { EkranOdblokowania, EkranUstawieniaHasla } from '../komponenty/EkranBlokady';
 import { KomunikatBledu, Ladowanie } from '../komponenty/Stany';
@@ -105,6 +105,7 @@ function Bramka() {
         <Stack.Screen name="klient/[id]" options={{ title: 'Profil klienta' }} />
         <Stack.Screen name="wizyta/[id]" options={{ title: 'Wizyta' }} />
         <Stack.Screen name="usterki" options={{ title: 'Otwarte usterki' }} />
+        <Stack.Screen name="kalendarz" options={{ title: 'Kalendarz' }} />
         {/* Ekran otwiera sie tylko z przycisku widocznego dla administratora,
             a i tak sam sprawdza uprawnienia - podobnie jak serwer. */}
         <Stack.Screen name="administracja" options={{ title: 'Dostep' }} />
@@ -141,10 +142,10 @@ export default function UkladGlowny() {
       <KeyboardProvider>
         <AplikacjaProvider>
         <StatusBar style="dark" />
-        {/* Cala aplikacja siedzi w ramce telefonu o proporcjach 9:16. */}
-        <RamkaTelefonu>
+        {/* Cala aplikacja siedzi w waskiej kolumnie o proporcjach 9:16. */}
+        <KolumnaEkranu>
           <Bramka />
-        </RamkaTelefonu>
+        </KolumnaEkranu>
         </AplikacjaProvider>
       </KeyboardProvider>
     </SafeAreaProvider>

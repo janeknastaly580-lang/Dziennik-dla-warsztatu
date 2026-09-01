@@ -17,23 +17,23 @@ Legenda statusów:
 ## Decyzja, która wycięła najwięcej ryzyk: brak zdjęć
 
 System **nie robi, nie wysyła i nie przechowuje zdjęć ani żadnych plików** —
-ani na telefonie, ani w bazie, ani w magazynie obiektów. Opis usterki jest
+ani na komputerze, ani w bazie, ani w magazynie obiektów. Opis usterki jest
 tekstem.
 
 Znikają przez to w całości: **A7** (EXIF/GPS/wizerunki), **A8** (publiczny
 bucket i pre‑signed URL), **B7** (rozjazd baza ↔ magazyn plików), **C3**
-(utrata zdjęć), **D6** (zapełniona pamięć telefonu) i większość **D7**
+(utrata zdjęć), **D6** (zapełniony dysk) i większość **D7**
 (zalanie łącza). W kodzie: brak `expo-image-picker`, brak tabeli `pliki`,
-uprawnienia do aparatu i galerii są jawnie zablokowane
-([frontend/app.json](frontend/app.json), `android.blockedPermissions`
-i [frontend/plugins/prywatnosc.js](frontend/plugins/prywatnosc.js)).
+a program nie ma dostępu ani do kamery, ani do plików poza własnym katalogiem
+danych — ekrany działają w piaskownicy bez Node
+([windows/glowny.js](windows/glowny.js), `contextIsolation` i `sandbox`).
 
 ---
 
 ## Druga decyzja: nic nie jest hostowane po stronie dostawcy
 
 Nie ma panelu administracyjnego na czyimkolwiek komputerze. Cały działający
-system to Supabase i telefony. Zarządzanie dostępem żyje **w tej samej
+system to Supabase i komputery w warsztatach. Zarządzanie dostępem żyje **w tej samej
 aplikacji**, pod rolą `administrator`.
 
 Znaczenie dla bezpieczeństwa:
@@ -49,11 +49,11 @@ Znaczenie dla bezpieczeństwa:
 
 Uprawnienia administratora są sprawdzane **dwa razy, niezależnie**: w funkcji
 brzegowej `admin` (rola z tokenu) oraz w każdej funkcji SQL
-(`sprawdz_admina()`). Podmiana żądania z telefonu zwykłego mechanika nic nie
+(`sprawdz_admina()`). Podmiana żądania ze stanowiska zwykłego mechanika nic nie
 daje — sprawdzone na żywo: `{"kod":"BRAK_UPRAWNIEN"}`.
 
 Zabezpieczenie przed zamknięciem się na zewnątrz: administrator nie może
-zablokować samego siebie, odciąć własnego telefonu ani zablokować **ostatniego
+zablokować samego siebie, odciąć własnego stanowiska ani zablokować **ostatniego
 czynnego administratora** warsztatu.
 
 ---
@@ -107,9 +107,9 @@ bezpieczniki**, nie sama dyscyplina.
 | sekrety Supabase | `SUPABASE_SERVICE_ROLE_KEY` dla Edge Functions | n/d |
 
 Dlaczego klucz publiczny leży w repozytorium: Expo i tak wkleja każdą zmienną
-`EXPO_PUBLIC_*` na stałe do paczki `.apk`/`.ipa`, którą da się rozpakować
-w kilka minut. Ukrywanie takiej wartości niczego nie chroni, a jej brak
-w repozytorium psuje build w chmurze EAS. Bezpieczeństwo nie stoi tu na
+`EXPO_PUBLIC_*` na stałe do zbudowanych ekranów, a paczkę programu da się
+rozpakować w kilka minut. Ukrywanie takiej wartości niczego nie chroni, a jej
+brak w repozytorium psuje budowanie programu. Bezpieczeństwo nie stoi tu na
 tajności klucza, tylko na tym, że klucz **nie otwiera niczego** (A1).
 
 **Bezpiecznik 1 — build.** `app.config.js` dekoduje każdy klucz z
@@ -140,7 +140,7 @@ cd narzedzia && npm run skanuj
 ### A3 — Zbyt szerokie reguły synchronizacji ✅
 
 Reguły synchronizacji to **osobna warstwa**, niezależna od RLS — dokładnie tak,
-jak mówi lista ryzyk. Telefon dostaje:
+jak mówi lista ryzyk. Komputer dostaje:
 
 - kartoteki klientów swojego warsztatu (są małe, a mechanik musi mieć pełną
   wyszukiwarkę offline),
@@ -149,72 +149,77 @@ jak mówi lista ryzyk. Telefon dostaje:
 
 Serwer: `pobierz_wizyty()` w
 [0003_funkcje_synchronizacji.sql](supabase/migracje/0003_funkcje_synchronizacji.sql).
-Telefon stosuje **tę samą regułę u siebie** — `posprzatajPozaOknem()` w
+Program stosuje **tę samą regułę u siebie** — `posprzatajPozaOknem()` w
 [frontend/src/dane/repozytorium.ts](frontend/src/dane/repozytorium.ts) kasuje
 lokalnie zamknięte wizyty spoza okna. Okno zmienia się w kolumnie `okno_dni`
-tabeli `warsztaty`, a telefony przyjmują nową wartość przy najbliższej
+tabeli `warsztaty`, a stanowiska przyjmują nową wartość przy najbliższej
 synchronizacji.
 
-### A4 — Zgubiony, skradziony lub sprzedany telefon ✅ ⚙️
+### A4 — Skradziony, zgubiony lub sprzedany komputer ✅ ⚙️
 
-- **Szyfrowanie lokalnej bazy (SQLCipher).** Plik SQLite na telefonie jest
-  zaszyfrowany. Klucza nie ma w kodzie: 256 bitów losowanych przy pierwszym
-  uruchomieniu, zapisanych w Keychain / Keystore z flagą
-  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. Skopiowanie pliku bazy ze znalezionego
-  telefonu daje szyfrogram.
-  Włączane opcją `useSQLCipher` wtyczki `expo-sqlite`
-  ([frontend/app.json](frontend/app.json)); klucz i otwarcie bazy —
-  [frontend/src/dane/baza.ts](frontend/src/dane/baza.ts).
-  ⚙️ Działa **wyłącznie we własnym buildzie**, nie w Expo Go i nie
-  w przeglądarce — patrz „Tryb podglądu" poniżej.
-- **Auto-wipe:** telefon, który nie połączył się z serwerem przez
+- **Szyfrowanie lokalnej bazy (SQLCipher).** Plik `warsztat.db`
+  w `%APPDATA%\Warsztat` jest zaszyfrowany. Klucza nie ma w kodzie: 256 bitów
+  losowanych przy pierwszym uruchomieniu i zapisanych przez **DPAPI Windows**
+  (`safeStorage`), czyli w szyfrowaniu przypisanym do tego konta i tego
+  komputera. Skopiowanie pliku bazy — albo wyjęcie dysku — daje szyfrogram
+  (sprawdzone: nagłówek pliku nie zawiera `SQLite format 3`, a wpisana treść
+  nie jest w nim widoczna).
+  Baza żyje w procesie głównym programu
+  ([windows/glowny.js](windows/glowny.js)); ekrany sięgają do niej wąskim
+  mostem ([frontend/src/dane/mostWindows.ts](frontend/src/dane/mostWindows.ts)),
+  klucz i migracje — [frontend/src/dane/baza.ts](frontend/src/dane/baza.ts).
+  ⚙️ Działa **wyłącznie w zbudowanym programie**, nie w przeglądarce —
+  patrz „Tryb podglądu" poniżej.
+- **Auto-wipe:** komputer, który nie połączył się z serwerem przez
   *wygaśnięcie offline* (domyślnie 14 dni, ustawiane per warsztat), kasuje całą
-  lokalną bazę. Skradziony telefon nigdy się nie połączy, więc wyczyści się sam.
+  lokalną bazę. Skradziony komputer nigdy się nie połączy, więc wyczyści się sam.
   `sprawdzWygasniecieOffline()` w
   [frontend/src/dane/synchronizacja.ts](frontend/src/dane/synchronizacja.ts);
   sprawdzane przy starcie, przy powrocie z tła i przy każdej próbie synchronizacji.
-- **Zdalne unieważnienie:** ekran „Dostęp" administratora → „Zablokuj telefon"
-  albo „Zgubiony". Telefon przy najbliższym kontakcie dostaje `WYCZYSC`
-  i kasuje dane.
+- **Zdalne unieważnienie:** ekran „Dostęp" administratora → „Zablokuj
+  stanowisko" albo „Zgubiony". Program przy najbliższym kontakcie dostaje
+  `WYCZYSC` i kasuje dane.
 - **Czyszczenie przy wylogowaniu** — razem z kluczem szyfrowania, więc
   pozostałości pliku na dysku są już nie do odczytania.
 - **Blokada po 10 nieudanych próbach hasła** — kasuje lokalną bazę.
 - **Wąskie okno synchronizacji (A3)** ogranicza to, co w ogóle jest do stracenia.
 
-👤 Systemowe szyfrowanie pamięci i ochrona Keystore działają **tylko wtedy, gdy
-telefon ma ustawiony PIN lub odcisk palca** — wymuś to na telefonach służbowych.
+👤 DPAPI chroni klucz na tyle, na ile chronione jest **konto Windows** —
+każdy mechanik musi mieć własne konto z hasłem, a komputer szyfrowany
+BitLockerem. Wspólne konto „warsztat" bez hasła znosi to zabezpieczenie.
 
-**Tryb podglądu (przeglądarka).** Aplikację można uruchomić na `localhost`, żeby
-obejrzeć interfejs. W przeglądarce nie ma ani Keychain/Keystore, ani SQLCipher —
+**Tryb podglądu (przeglądarka).** Ekrany można uruchomić na `localhost`, żeby
+obejrzeć interfejs. W przeglądarce nie ma ani DPAPI, ani SQLCipher —
 token, hasło i baza leżą w zwykłym `localStorage`. Zamiast po cichu obniżać
 poziom zabezpieczeń, aplikacja przez cały czas wyświetla pomarańczowy pasek
-„TRYB PODGLĄDU — brak szyfrowania danych". Jedyne miejsce, które wie o istnieniu
-obu światów, to
+„TRYB PODGLĄDU — brak szyfrowania danych". Jedyne miejsca, które wiedzą
+o istnieniu obu światów, to
+[frontend/src/dane/mostWindows.ts](frontend/src/dane/mostWindows.ts) i
 [frontend/src/dane/pamiecBezpieczna.ts](frontend/src/dane/pamiecBezpieczna.ts).
-👤 Do warsztatu idzie wyłącznie APK — nigdy adres webowy.
+👤 Do warsztatu idzie wyłącznie zbudowany program — nigdy adres webowy.
 
-### A5 — Aplikacja otwarta na niezablokowanym telefonie ⚠️ *(świadomie osłabione)*
+### A5 — Program otwarty na niezablokowanym komputerze ⚠️ *(świadomie osłabione)*
 
-Własna blokada aplikacji, niezależna od blokady systemowej:
+Własna blokada programu, niezależna od blokady Windows:
 
-- hasło (dowolne — mechanik wymyśla je sam) albo odcisk palca / Face ID,
-- **hasło przy każdym uruchomieniu aplikacji** — sesja żyje w pamięci procesu,
-  więc ubicie aplikacji przez system, restart telefonu, a w przeglądarce
-  zamknięcie karty oznaczają ponowne pytanie o hasło,
-- przycisk „Zablokuj aplikację teraz” — do ręki, gdy oddajesz komuś telefon.
+- hasło (dowolne — mechanik wymyśla je sam),
+- **hasło przy każdym uruchomieniu programu** — sesja żyje w pamięci procesu,
+  więc zamknięcie okna, restart komputera, a w przeglądarce zamknięcie karty
+  oznaczają ponowne pytanie o hasło,
+- przycisk „Zablokuj aplikację teraz” — do ręki, gdy odchodzisz od komputera.
 
 **Czego tu NIE MA, a było wcześniej** (decyzja warsztatu, 31.08.2026):
 automatycznego zablokowania po 5 minutach bezczynności i zablokowania przy
 przejściu aplikacji w tło. Mechanik wpisywał hasło kilkanaście razy dziennie —
-za każdym razem, gdy odebrał telefon albo sprawdził SMS — i zaczynał ustawiać
+za każdym razem, gdy odszedł na chwilę od stanowiska — i zaczynał ustawiać
 hasła jednoznakowe, co dawało zabezpieczenie gorsze niż jego brak.
 
-**Co to zmienia w praktyce:** telefon **odblokowany i pozostawiony bez opieki**
-pokazuje dane klientów, dopóki aplikacja żyje. Obroną jest teraz blokada
-ekranu samego telefonu (PIN / odcisk palca) — patrz punkt 5 w
+**Co to zmienia w praktyce:** komputer **odblokowany i pozostawiony bez opieki**
+pokazuje dane klientów, dopóki program jest otwarty. Obroną jest teraz blokada
+ekranu Windows (Win+L, wygaszacz z hasłem) — patrz punkt 5 w
 [DO-ZROBIENIA-RECZNIE.md](DO-ZROBIENIA-RECZNIE.md), który z „dobrej praktyki”
 staje się przez to **wymogiem**. Nienaruszone zostają: szyfrowanie bazy (A4),
-zdalne odcięcie telefonu (A6) i samoczynne czyszczenie po długim braku
+zdalne odcięcie stanowiska (A6) i samoczynne czyszczenie po długim braku
 kontaktu z serwerem.
 
 [frontend/src/dane/kontekst.tsx](frontend/src/dane/kontekst.tsx),
@@ -226,12 +231,12 @@ Procedura offboardingu to **jeden przycisk w aplikacji administratora**
 (ekran „Dostęp” → „Odbierz dostęp”). Skutek natychmiastowy:
 
 - konto mechanika oznaczone jako zablokowane,
-- wszystkie jego telefony dostają `WYCZYSC` przy najbliższym kontakcie i kasują
-  lokalną bazę,
+- wszystkie jego stanowiska dostają `WYCZYSC` przy najbliższym kontakcie
+  i kasują lokalną bazę,
 - token nie daje już dostępu do żadnych danych,
 - wpis w dzienniku działań administratora (kto, kiedy, kogo).
 
-Jeśli telefon jest offline — domyka to auto‑wipe z A4.
+Jeśli komputer jest offline — domyka to auto‑wipe z A4.
 `admin_zablokuj_mechanika()` w
 [0011_funkcje_administratora.sql](supabase/migracje/0011_funkcje_administratora.sql)
 sprawdza uprawnienia niezależnie od funkcji brzegowej i pilnuje, żeby warsztat
@@ -249,10 +254,10 @@ Nie ma magazynu plików. Supabase Storage nie jest w tym projekcie używany.
 
 Mechanik **nie ma hasła do systemu** — nie ma czego wyłudzić. Dostęp przyznaje
 administrator zdalnie, jednorazowo, przypisując ośmioznakowy kod z ekranu
-telefonu do konkretnego człowieka. Hasło, które mechanik ustawia, to lokalna
+stanowiska do konkretnego człowieka. Hasło, które mechanik ustawia, to lokalna
 blokada aplikacji: nie otwiera niczego w internecie, więc jego wyciek nie daje
 dostępu do bazy. Sam kod parowania też nie jest sekretem — bez zgody
-administratora i bez sekretu zapisanego w Keychain nic nie znaczy.
+administratora i bez sekretu zapisanego w DPAPI nic nie znaczy.
 
 Administrator wchodzi do aplikacji tak samo jak mechanik — nie ma osobnego
 panelu ani osobnego hasła. Jego dodatkowe uprawnienia wiszą na roli w bazie
@@ -279,30 +284,28 @@ i tokenie urządzenia, a nie na haśle, które dałoby się wyłudzić.
 - W projekcie nie ma Sentry ani innego crash reportingu. 👤 Jeśli będziesz go
   dodawać, wyłącz wysyłanie ciał żądań i stanu aplikacji.
 
-### A12 — Automatyczny backup lokalnej bazy do iCloud / Google Drive ✅ ⚙️
+### A12 — Kopia lokalnej bazy w chmurze (OneDrive) ✅ ⚙️
 
-Wtyczka [frontend/plugins/prywatnosc.js](frontend/plugins/prywatnosc.js):
+Dane programu leżą w `%APPDATA%\Warsztat` — czyli w `AppData\Roaming`,
+katalogu, którego OneDrive **nie synchronizuje**. Domyślna kopia zapasowa
+Windows obejmuje Pulpit, Dokumenty i Obrazy; baza warsztatu nie jest w żadnym
+z nich.
 
-- **Android:** `android:allowBackup="false"`, `android:fullBackupContent="false"`
-  oraz plik reguł `dataExtractionRules` wykluczający wszystko z kopii w chmurze
-  i z przenoszenia między urządzeniami. **Sprawdzone** — `expo config
-  --type introspect` pokazuje te atrybuty w manifeście.
-- **iOS:** wtyczka dopisuje do `AppDelegate` ustawienie
-  `isExcludedFromBackupKey` na katalogu `Documents` (tam mieszka plik SQLite).
-- Klucze w Keychain mają `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, więc nie wędrują
-  z kopią nawet gdyby coś przeszło.
+Nawet gdyby ktoś świadomie skopiował te pliki do chmury, wynosi wtedy sam
+szyfrogram: klucz zostaje w DPAPI tego konta Windows i nie da się go odtworzyć
+z kopii pliku.
 
-⚙️ Wtyczka działa przy `expo prebuild` / `eas build` — **nie działa w Expo Go**.
-Zweryfikuj po zbudowaniu, nie zakładaj (instrukcja w
-[DO-ZROBIENIA-RECZNIE.md](DO-ZROBIENIA-RECZNIE.md)).
+⚙️ Zweryfikuj po zainstalowaniu, nie zakładaj: sprawdź, czy w firmowej polityce
+OneDrive nikt nie dopisał `AppData` do synchronizowanych katalogów (instrukcja
+w [DO-ZROBIENIA-RECZNIE.md](DO-ZROBIENIA-RECZNIE.md)).
 
-### A13 — Telefony prywatne mechaników (BYOD) 👤
+### A13 — Prywatne komputery mechaników (BYOD) 👤
 
-To decyzja organizacyjna, nie techniczna. Rekomendacja: telefony służbowe.
-Detekcja root/jailbreak nie jest zaimplementowana — na zrootowanym telefonie
-każde zabezpieczenie po stronie aplikacji da się obejść, więc dawałaby złudne
-poczucie bezpieczeństwa. Realną obroną są tu A3 (mało danych na telefonie),
-A4 (auto‑wipe) i A6 (odcięcie na żądanie).
+To decyzja organizacyjna, nie techniczna. Rekomendacja: komputery służbowe,
+każdy z własnym kontem Windows i BitLockerem. Na komputerze, na którym ktoś ma
+uprawnienia administratora Windows i konto mechanika bez hasła, każde
+zabezpieczenie po stronie programu da się obejść. Realną obroną są tu A3 (mało
+danych na komputerze), A4 (auto‑wipe) i A6 (odcięcie na żądanie).
 
 ### A14 — Łańcuch sub‑procesorów i CLOUD Act ✅ 👤
 
@@ -330,7 +333,7 @@ Szablony do uzupełnienia leżą w katalogu [rodo/](rodo/):
 
 ### B1 — Nadpisanie cudzej zmiany przy pełnym UPDATE wiersza ✅
 
-Telefon wysyła **wyłącznie kolumny, które faktycznie zmienił**.
+Komputer wysyła **wyłącznie kolumny, które faktycznie zmienił**.
 `tylkoZmienione()` w
 [frontend/src/dane/repozytorium.ts](frontend/src/dane/repozytorium.ts) porównuje
 nowe wartości ze stanem lokalnym i wkłada do kolejki tylko różnicę. Serwer
@@ -372,22 +375,22 @@ sam z siebie nie zgłosi błędu:
 
 W bazie **nie ma ani jednej kolumny agregującej**. Wszystkie liczniki
 („3 otwarte usterki”, liczba aut, suma kosztów) są liczone `COUNT()`/`SUM()`
-przy odczycie — i po stronie serwera, i w lokalnej bazie telefonu
+przy odczycie — i po stronie serwera, i w lokalnej bazie komputera
 (`listaKlientow()`, `profilKlienta()`).
 
 ### B5 — Numeracja sekwencyjna zleceń ✅
 
-- Klucze główne to **UUID nadawane na telefonie** (`Crypto.randomUUID()`).
-- **Numer roboczy** powstaje na telefonie z prefiksem warsztatu:
+- Klucze główne to **UUID nadawane na komputerze** (`Crypto.randomUUID()`).
+- **Numer roboczy** powstaje na komputerze z prefiksem warsztatu:
   `W1-2026-0001`. Mechanik ma czym nazwać zlecenie od razu, offline.
 - **Numer oficjalny** nadaje wyłącznie serwer przy pierwszym udanym zapisie —
   `nadaj_numer()` z licznikiem per warsztat i rok: `W1/2026/0001`.
   Dwa warsztaty offline nie mogą wygenerować tego samego numeru, bo żaden
-  telefon numeru oficjalnego nie nadaje.
+  komputer numeru oficjalnego nie nadaje.
 
-### B6 — Przestawiony zegar telefonu ✅
+### B6 — Przestawiony zegar komputera ✅
 
-Każdy rekord ma `zrobione_o` (zegar telefonu) i `zapisane_o` (zegar Postgresa).
+Każdy rekord ma `zrobione_o` (zegar komputera) i `zapisane_o` (zegar Postgresa).
 Trigger `trg_znaczniki()` przycina: `zrobione_o = LEAST(zrobione_o, now())`.
 **Sprawdzone:** wizyta wysłana z datą +3 dni w przyszłość została przycięta.
 
@@ -403,15 +406,15 @@ To ryzyko potraktowane najpoważniej — trzy niezależne zabezpieczenia:
    `zapisz_z_telefonu()` łapie **każdy** wyjątek SQL, odkłada rekord do tabeli
    `kwarantanna` i kończy się **poprawnie**. Edge Function ma na to jeszcze
    drugą siatkę: `try/catch` wokół wywołania RPC, też kończący kwarantanną.
-   Awaria serwera (5xx) jest zwracana jako `503 {ponow:true}` — telefon
+   Awaria serwera (5xx) jest zwracana jako `503 {ponow:true}` — komputer
    ponawia, nic nie wyrzuca.
-2. **Kolejka na telefonie nigdy nie stoi za jedną pozycją.** Pozycja znika
+2. **Kolejka na komputerze nigdy nie stoi za jedną pozycją.** Pozycja znika
    z kolejki, gdy serwer *potwierdzi jej przyjęcie* — także wtedy, gdy odłożył
    ją do kwarantanny. Błąd sieci zostawia ją na miejscu.
    [frontend/src/dane/kolejka.ts](frontend/src/dane/kolejka.ts)
 3. **Widoczność:** licznik „N czeka na wysłanie” na każdym ekranie,
    ostrzeżenie, gdy najstarsza pozycja czeka ponad dobę. Po stronie serwera
-   funkcja `raport_synchronizacji()` pokazuje, który telefon milczy dłużej
+   funkcja `raport_synchronizacji()` pokazuje, który komputer milczy dłużej
    niż dobę.
 
 **Sprawdzone na żywo:** w jednej paczce wysłano poprawnego klienta, poprawną
@@ -423,12 +426,12 @@ tabeli. Wynik: dwa `ok`, dwa `kwarantanna`, kolejka pusta, HTTP 200.
 Rozwiązane automatycznie przez B2 (wizyta nigdy nie znika fizycznie, więc klucz
 obcy się zgadza) plus regułę z B8 (przyjmij i odłóż zamiast odrzucać).
 Dodatkowo operacja `usun` na nieistniejącym wierszu **nie jest błędem** —
-rekord może jeszcze nie dojechać z innego telefonu.
+rekord może jeszcze nie dojechać z innego komputera.
 
 ### B10 — Zmiana schematu przy starych wersjach aplikacji ✅
 
 - **Migracje wyłącznie addytywne** — nowe kolumny nullable z wartością
-  domyślną. Zasada zapisana w nagłówkach migracji i w lokalnej bazie telefonu
+  domyślną. Zasada zapisana w nagłówkach migracji i w lokalnej bazie komputera
   ([frontend/src/dane/baza.ts](frontend/src/dane/baza.ts), tablica `MIGRACJE`
   z `PRAGMA user_version`).
 - **Wersja schematu w każdym żądaniu** (`wersja_schematu`), sprawdzana przez
@@ -441,12 +444,12 @@ rekord może jeszcze nie dojechać z innego telefonu.
 
 Obowiązują te same reguły co przy dwóch mechanikach (B1, B12, B3) — nic nie
 jest zakładane o unikalności urządzenia. Ekran „Dostęp” pokazuje wszystkie
-telefony przypisane do mechanika i pozwala każdy z osobna zablokować
+komputery przypisane do mechanika i pozwala każdy z osobna zablokować
 lub wyrejestrować.
 
 ### B12 — Duplikaty z ponowień ✅
 
-- Identyfikator rekordu powstaje **na telefonie przy tworzeniu** i jest ten sam
+- Identyfikator rekordu powstaje **na komputerze przy tworzeniu** i jest ten sam
   przy każdym ponowieniu.
 - Każda pozycja kolejki ma **klucz idempotencji** (`urządzenie:pozycja`).
   Serwer zapamiętuje wynik w tabeli `operacje` i przy powtórce oddaje
@@ -458,7 +461,7 @@ zwrócił `{"status":"ok","powtorka":true}`, a dane w bazie **nie zmieniły się
 
 ### B13 — Brak walidacji po stronie serwera ✅
 
-Każdy zapis z telefonu jest traktowany jako niezaufany, na trzech poziomach:
+Każdy zapis z komputera jest traktowany jako niezaufany, na trzech poziomach:
 
 1. Edge Function: lista dozwolonych tabel, operacji i kolumn, sprawdzenie
    formatu UUID, przycinanie długości, limit 200 zmian na żądanie.
@@ -503,7 +506,7 @@ Nie ma zdjęć ani magazynu obiektów.
 ### D1 — Wylogowanie przez wygasły token ✅ — **ryzyko usunięte u źródła**
 
 Zamiast walczyć z odświeżaniem sesji, projekt **nie używa Supabase Auth dla
-mechaników**. Telefon dostaje **opaque token urządzenia, który nie ma daty
+mechaników**. Komputer dostaje **opaque token urządzenia, który nie ma daty
 ważności i nigdy nie jest odświeżany**. Nie ma czego odświeżyć, więc brak sieci
 nie ma jak nikogo wylogować. Sesję unieważnia wyłącznie administrator.
 
@@ -511,7 +514,7 @@ Do tego:
 
 - ekrany czytają **wyłącznie z lokalnej bazy SQLite** — nigdy z sieci,
 - o tym, co pokazać (parowanie / hasło / blokada / aplikacja), decyduje
-  wyłącznie zawartość telefonu ([frontend/src/dane/kontekst.tsx](frontend/src/dane/kontekst.tsx)),
+  wyłącznie zawartość komputera ([frontend/src/dane/kontekst.tsx](frontend/src/dane/kontekst.tsx)),
 - nieudana synchronizacja **nigdy** nie czyści sesji ani kolejki; jedyny
   wyjątek to jawna odpowiedź serwera „zablokowane / wyczyść”,
 - ekran odblokowania nie dotyka sieci.
@@ -529,7 +532,7 @@ potrzebny jest internet. Później aplikacja działa także bez zasięgu”.
 
 ### D3 — Pierwsza pełna synchronizacja jest ciężka ✅
 
-Wąskie okno (A3) drastycznie to skraca — na telefon idzie 90 dni historii,
+Wąskie okno (A3) drastycznie to skraca — na komputer idzie 90 dni historii,
 nie pięć lat. Pobieranie stronami po 500 wierszy z kursorem, więc przerwane
 połączenie nie zaczyna od zera. 👤 Pierwszą synchronizację zrób po Wi‑Fi.
 
@@ -547,12 +550,12 @@ natychmiastowa synchronizacja. Pociągnięcie listy w dół robi to samo.
 - **Znacznik przy każdym rekordzie** — kafelek klienta i kafelek wizyty
   pokazują „⏱ czeka na wysłanie”, dopóki zmiana nie dotrze na serwer.
 - Na ekranie zgłoszenia dodatkowo pełne zdanie wyjaśniające, że dane są
-  bezpiecznie zapisane na telefonie.
+  bezpiecznie zapisane na komputerze.
 - Ostrzeżenie, gdy najstarsza pozycja czeka ponad dobę.
 
 To bezpośrednio ogranicza B3 — mechanik nie wpisuje tego samego drugi raz.
 
-### D6 — Zapełniona pamięć telefonu ➖
+### D6 — Zapełniona pamięć komputera ➖
 
 Nie ma zdjęć, więc kolejka to sam tekst. Baza jest dodatkowo przycinana do okna
 90 dni.
@@ -567,7 +570,7 @@ Nie ma zdjęć, więc kolejka to sam tekst. Baza jest dodatkowo przycinana do ok
 
 ### D8 — Aplikacja zabita w tle podczas wysyłki ✅
 
-Kolejka jest tabelą SQLite — przeżywa restart, crash i wyłączenie telefonu.
+Kolejka jest tabelą SQLite — przeżywa restart, crash i wyłączenie komputera.
 Wysyłka wznawia się przy następnym otwarciu aplikacji i przy każdym powrocie
 z tła (`AppState`). Zadanie w tle (`expo-background-task`) nie jest dodane —
 przy kolejce tekstowej i cyklu co 2 minuty w trakcie pracy nie daje realnej
@@ -601,7 +604,7 @@ po powrocie usługi wszystko dochodzi. Awaria (5xx) jest zwracana jako
 | 4 | B8 — kwarantanna zamiast 4xx | ✅ zrobione i **sprawdzone** |
 | 5 | B2 — soft delete wszędzie | ✅ zrobione i **sprawdzone** |
 | 6 | A2 — zero service_role w aplikacji + skaner | ✅ zrobione, 👤 zainstaluj hook |
-| 7 | A12 — wyłączenie kopii zapasowych | ✅ Android sprawdzony, ⚙️ iOS do weryfikacji po buildzie |
+| 7 | A12 — dane poza katalogami synchronizowanymi z chmurą | ✅ zrobione, ⚙️ sprawdź politykę OneDrive w firmie |
 | 8 | B1 — UPDATE tylko na zmienionych kolumnach | ✅ zrobione i **sprawdzone** |
 | 9 | A4 — szyfrowanie lokalnej bazy + auto‑wipe po 14 dniach | ✅ zrobione (SQLCipher włączony) |
 | 10 | C1 — własna kopia u innego dostawcy | ✅ narzędzia gotowe, 👤 uruchom i przetestuj odtworzenie |

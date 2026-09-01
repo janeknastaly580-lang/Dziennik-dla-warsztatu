@@ -8,47 +8,44 @@
  * miejsca przenosi ja tam bez zmiany dlugosci. Wszystko przyciaga sie do
  * kwadransa, wiec palec nie musi byc precyzyjny.
  *
- * Bloki w tle to wizyty juz zaplanowane na ten dzien - mechanik widzi zajete
- * godziny w chwili wybierania, a nie po zapisie. Czytane sa z lokalnej bazy,
- * wiec siatka dziala tak samo bez zasiegu (D1).
+ * Dzien zmienia sie strzalkami, a dotkniecie jego nazwy rozwija siatke
+ * miesiaca - patrz `PasekDnia`. Bloki w tle to wizyty juz zaplanowane na ten
+ * dzien: mechanik widzi zajete godziny w chwili wybierania, a nie po zapisie.
+ * Wszystko idzie z lokalnej bazy, wiec dziala tak samo bez zasiegu (D1).
  *
  * Swiadomie NIE ma tu ani jednej linijki instrukcji: ksztalt, kolka i
  * przyciaganie tlumacza sie same, a kazde zdanie na tym ekranie zabieraloby
  * miejsce samemu kalendarzowi.
  *
  * Nie uzywamy komponentu `Modal` - tak samo jak w `Potwierdzenie.tsx`,
- * bo na webie renderuje sie poza ramka telefonu. Dlatego tez skladaja sie
+ * bo na webie renderuje sie poza ramka komputera. Dlatego tez skladaja sie
  * na to DWA komponenty: wiersz siedzi w formularzu, a `KalendarzTerminu`
  * ekran musi wstawic OBOK formularza. Nakladka rozpieta wewnatrz
  * przewijanej tresci przykrylaby tylko wlasna sekcje, a nie caly ekran.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BackHandler, Keyboard, PanResponder, Platform, Pressable, ScrollView,
-  StyleSheet, Text, View, type LayoutChangeEvent,
+  Keyboard, PanResponder, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 
 import { Przycisk } from './Formularz';
+import PasekDnia from './PasekDnia';
+import SiatkaDnia, { PIKSELE_NA_MINUTE } from './SiatkaDnia';
 import { wizytyDnia } from '../dane/repozytorium';
-import { Kolory, Odstepy, Zaokraglenia, cien, opisStatusu } from '../motyw';
+import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
 import {
   DZIEN, MIN_DLUGOSC, type Termin, dlugosc, doKroku, etykietaDnia,
-  formatujCzasTrwania, formatujGodziny, naGodzine, naMinuty, przesunDzien, wzgledemDzis,
+  formatujCzasTrwania, formatujGodziny, naGodzine, naMinuty, wzgledemDzis,
 } from '../termin';
 import { CEL_DOTYKU, s } from '../uklad';
 import type { Wizyta } from '../typy';
 
-/** Wysokosc jednej godziny - z niej wynikaja wszystkie pozycje na siatce. */
-const WYS_GODZINY = s(56);
-const PIKSELE_NA_MINUTE = WYS_GODZINY / 60;
-/** Kolumna z godzinami po lewej. */
-const SZEROKOSC_GODZIN = s(50);
-/** Widoczna kropka uchwytu; obszar dotyku jest duzo wiekszy. */
-const PROMIEN_UCHWYTU = s(8);
 /** Jak gleboko w bloku siedzi kropka uchwytu. */
 const WCIECIE_UCHWYTU = s(12);
-const WYSOKOSC_SIATKI = DZIEN * PIKSELE_NA_MINUTE;
-const GODZINY = Array.from({ length: 24 }, (_, i) => i);
+/** Szerokosc godziny krawedzi - tyle, ile kolumna godzin na siatce. */
+const SZEROKOSC_KRAWEDZI = s(50) - s(8);
+/** Widoczna kropka uchwytu; obszar dotyku jest duzo wiekszy. */
+const PROMIEN_UCHWYTU = s(8);
 
 const ogranicz = (wartosc: number, min: number, max: number) =>
   Math.min(Math.max(wartosc, min), max);
@@ -87,7 +84,7 @@ export default function WierszTerminu({
 }
 
 /* ===================================================================== */
-/*  Siatka dnia                                                           */
+/*  Kalendarz z wybieranym terminem                                       */
 /* ===================================================================== */
 
 export function KalendarzTerminu({
@@ -103,9 +100,10 @@ export function KalendarzTerminu({
   const [koniec, setKoniec] = useState(() =>
     Math.max(naMinuty(wartosc.godzinaDo), naMinuty(wartosc.godzinaOd) + MIN_DLUGOSC));
   const [zajete, setZajete] = useState<Wizyta[]>([]);
-  const [szerokosc, setSzerokosc] = useState(0);
+  /* Godzina, na ktorej staje widok. Celowo NIE zmienia sie przy przeciaganiu -
+     siatka uciekalaby spod palca; przestawia ja dopiero zmiana dnia. */
+  const [przewinDo] = useState(() => naMinuty(wartosc.godzinaOd));
 
-  const przewijanie = useRef<ScrollView>(null);
   /** Miejsce dotkniecia tla, liczone od poczatku siatki (czyli od polnocy). */
   const dotkniecie = useRef(Number.NaN);
   /** Biezacy zakres dla gestow - te same liczby, tylko czytane synchronicznie. */
@@ -123,24 +121,15 @@ export function KalendarzTerminu({
     return () => { aktywny = false; };
   }, [data, pomijanaWizyta]);
 
-  /* Sprzetowy "wstecz" zamyka kalendarz, a nie caly formularz. */
+  /* Escape zamyka kalendarz, a nie caly formularz. */
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onAnuluj();
-      return true;
-    });
-    return () => sub.remove();
+    if (typeof window === 'undefined') return;
+    const naKlawisz = (zdarzenie: KeyboardEvent) => {
+      if (zdarzenie.key === 'Escape') onAnuluj();
+    };
+    window.addEventListener('keydown', naKlawisz);
+    return () => window.removeEventListener('keydown', naKlawisz);
   }, [onAnuluj]);
-
-  /* Otwarcie ustawia widok na wybranych godzinach, a nie na polnocy. */
-  useEffect(() => {
-    const y = Math.max(0, od * PIKSELE_NA_MINUTE - WYS_GODZINY * 1.5);
-    const uchwyt = setTimeout(() => przewijanie.current?.scrollTo({ y, animated: false }), 0);
-    return () => clearTimeout(uchwyt);
-    // Tylko przy otwarciu - pozniej mechanik przewija dzien sam.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   /**
    * Trzy gesty na tej samej zasadzie: przesuniecie palca w pikselach idzie
@@ -199,137 +188,69 @@ export function KalendarzTerminu({
     },
   }), []);
 
-  const zmierz = useCallback((zdarzenie: LayoutChangeEvent) => {
-    setSzerokosc(zdarzenie.nativeEvent.layout.width);
-  }, []);
-
   const gorna = od * PIKSELE_NA_MINUTE;
   const dolna = koniec * PIKSELE_NA_MINUTE;
   const termin: Termin = { data, godzinaOd: naGodzine(od), godzinaDo: naGodzine(koniec) };
-  const podpisDnia = wzgledemDzis(data);
-  /** Etykieta godziny chowa sie, gdy zaslania ja niebieska godzina krawedzi. */
-  const zaslonieta = (y: number) =>
-    Math.abs(y - gorna) < s(15) || Math.abs(y - dolna) < s(15);
+
+  /** Etykieta godziny chowa sie, gdy zaslania ja godzina krawedzi bloku. */
+  const ukryjGodzine = useCallback((y: number) => (
+    Math.abs(y - od * PIKSELE_NA_MINUTE) < s(15)
+    || Math.abs(y - koniec * PIKSELE_NA_MINUTE) < s(15)
+  ), [od, koniec]);
 
   return (
     <View style={style.warstwa}>
-      <View style={style.naglowek}>
-        <Pressable
-          onPress={() => setData(przesunDzien(data, -1))}
-          accessibilityRole="button"
-          accessibilityLabel="Poprzedni dzien"
-          hitSlop={10}
-          style={({ pressed }) => [style.strzalka, pressed && style.strzalkaWcisnieta]}
-        >
-          <Text style={style.strzalkaTekst}>{'‹'}</Text>
-        </Pressable>
+      <PasekDnia data={data} onZmiana={setData} />
 
-        <View style={style.naglowekSrodek}>
-          <Text style={style.naglowekDzien}>{etykietaDnia(data)}</Text>
-          {podpisDnia ? <Text style={style.naglowekPodpis}>{podpisDnia}</Text> : null}
-        </View>
-
-        <Pressable
-          onPress={() => setData(przesunDzien(data, 1))}
-          accessibilityRole="button"
-          accessibilityLabel="Nastepny dzien"
-          hitSlop={10}
-          style={({ pressed }) => [style.strzalka, pressed && style.strzalkaWcisnieta]}
-        >
-          <Text style={style.strzalkaTekst}>{'›'}</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView
-        ref={przewijanie}
-        style={style.przewijanie}
-        contentContainerStyle={style.przewijanieTresc}
-        showsVerticalScrollIndicator={false}
+      <SiatkaDnia
+        dzien={data}
+        wizyty={zajete}
+        przewinDo={przewinDo}
+        tlo={tlo.panHandlers}
+        rezerwacjaOd={od}
+        rezerwacjaDo={koniec}
+        ukryjGodzine={ukryjGodzine}
       >
-        <View style={style.siatka} onLayout={zmierz}>
-          {/* Puste miejsce - dotkniecie przenosi tam wizyte. */}
-          <View style={style.tlo} {...tlo.panHandlers} />
+        {({ left, width }) => (
+          <>
+            {/* Wybrany termin */}
+            <View
+              style={[style.blok, { top: gorna, height: dolna - gorna, left, width }]}
+              {...gesty.blok.panHandlers}
+            >
+              <Text style={style.blokCzas} numberOfLines={1}>
+                {formatujCzasTrwania(koniec - od)}
+              </Text>
+            </View>
 
-          {/* Linie i godziny */}
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {GODZINY.map((godzina) => {
-              const y = godzina * WYS_GODZINY;
-              return (
-                <View key={godzina} style={[style.linia, { top: y }]}>
-                  {zaslonieta(y) ? null : (
-                    <Text style={style.liniaGodzina}>{naGodzine(godzina * 60)}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
+            {/* Godziny krawedzi - w kolorze akcentu, na miejscu etykiet godzin */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <Text style={[style.krawedz, { top: gorna - s(8) }]}>{naGodzine(od)}</Text>
+              <Text style={[style.krawedz, { top: dolna - s(8) }]}>{naGodzine(koniec)}</Text>
+            </View>
 
-          {/* Wizyty juz zaplanowane na ten dzien */}
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {zajete.map((w) => {
-              const zOd = naMinuty(w.godzina_od);
-              const zDo = Math.max(naMinuty(w.godzina_do), zOd + MIN_DLUGOSC);
-              const kolory = opisStatusu(w.status);
-              return (
-                <View
-                  key={w.id}
-                  style={[style.zajete, {
-                    top: zOd * PIKSELE_NA_MINUTE,
-                    height: (zDo - zOd) * PIKSELE_NA_MINUTE,
-                    backgroundColor: kolory.tlo,
-                    borderColor: kolory.obramowanie,
-                    borderLeftColor: kolory.kolor,
-                  }]}
-                >
-                  <Text style={style.zajeteTytul} numberOfLines={1}>{w.tytul}</Text>
-                  <Text style={style.zajetePodpis} numberOfLines={1}>
-                    {naGodzine(zOd)}
-                    {'–'}
-                    {naGodzine(zDo)}
-                    {w.klient_nazwa ? `  ·  ${w.klient_nazwa}` : ''}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Wybrany termin */}
-          <View
-            style={[style.blok, { top: gorna, height: dolna - gorna }]}
-            {...gesty.blok.panHandlers}
-          >
-            <Text style={style.blokCzas} numberOfLines={1}>
-              {formatujCzasTrwania(koniec - od)}
-            </Text>
-          </View>
-
-          {/* Godziny krawedzi - w kolorze akcentu, na miejscu etykiet godzin */}
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            <Text style={[style.krawedz, { top: gorna - s(8) }]}>{naGodzine(od)}</Text>
-            <Text style={[style.krawedz, { top: dolna - s(8) }]}>{naGodzine(koniec)}</Text>
-          </View>
-
-          {/* Uchwyty: poczatek na gorze po lewej, koniec na dole po prawej */}
-          <View
-            style={[style.uchwyt, {
-              top: gorna - CEL_DOTYKU / 2,
-              left: SZEROKOSC_GODZIN + WCIECIE_UCHWYTU - CEL_DOTYKU / 2,
-            }]}
-            {...gesty.gora.panHandlers}
-          >
-            <View style={style.kropka} />
-          </View>
-          <View
-            style={[style.uchwyt, {
-              top: dolna - CEL_DOTYKU / 2,
-              left: Math.max(0, szerokosc - WCIECIE_UCHWYTU - CEL_DOTYKU / 2),
-            }]}
-            {...gesty.dol.panHandlers}
-          >
-            <View style={style.kropka} />
-          </View>
-        </View>
-      </ScrollView>
+            {/* Uchwyty: poczatek na gorze po lewej, koniec na dole po prawej */}
+            <View
+              style={[style.uchwyt, {
+                top: gorna - CEL_DOTYKU / 2,
+                left: left + WCIECIE_UCHWYTU - CEL_DOTYKU / 2,
+              }]}
+              {...gesty.gora.panHandlers}
+            >
+              <View style={style.kropka} />
+            </View>
+            <View
+              style={[style.uchwyt, {
+                top: dolna - CEL_DOTYKU / 2,
+                left: left + width - WCIECIE_UCHWYTU - CEL_DOTYKU / 2,
+              }]}
+              {...gesty.dol.panHandlers}
+            >
+              <View style={style.kropka} />
+            </View>
+          </>
+        )}
+      </SiatkaDnia>
 
       <View style={style.stopka}>
         <View style={style.stopkaOpis}>
@@ -378,83 +299,9 @@ const style = StyleSheet.create({
     backgroundColor: Kolory.tlo,
     zIndex: 20,
   },
-  naglowek: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Kolory.powierzchnia,
-    borderBottomWidth: 1,
-    borderBottomColor: Kolory.obramowanie,
-    paddingHorizontal: Odstepy.s,
-    paddingVertical: Odstepy.s,
-  },
-  strzalka: {
-    width: CEL_DOTYKU,
-    height: CEL_DOTYKU,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Zaokraglenia.pelne,
-  },
-  strzalkaWcisnieta: { backgroundColor: Kolory.akcentTlo },
-  strzalkaTekst: { fontSize: s(26), color: Kolory.akcent, marginTop: -s(4) },
-  naglowekSrodek: { flex: 1, alignItems: 'center' },
-  naglowekDzien: { fontSize: s(17), fontWeight: '800', color: Kolory.tekst },
-  naglowekPodpis: {
-    fontSize: s(11.5),
-    fontWeight: '700',
-    color: Kolory.akcent,
-    letterSpacing: 0.4,
-    marginTop: 1,
-  },
-
-  przewijanie: { flex: 1 },
-  przewijanieTresc: { paddingBottom: Odstepy.xl },
-  siatka: {
-    height: WYSOKOSC_SIATKI,
-    backgroundColor: Kolory.powierzchnia,
-  },
-  tlo: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: SZEROKOSC_GODZIN,
-    right: 0,
-  },
-  linia: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: WYS_GODZINY,
-    borderTopWidth: 1,
-    borderTopColor: Kolory.obramowanie,
-  },
-  liniaGodzina: {
-    position: 'absolute',
-    top: -s(8),
-    left: 0,
-    width: SZEROKOSC_GODZIN - s(8),
-    textAlign: 'right',
-    fontSize: s(11.5),
-    color: Kolory.tekstSlaby,
-  },
-
-  zajete: {
-    position: 'absolute',
-    left: SZEROKOSC_GODZIN,
-    right: Odstepy.s,
-    borderWidth: 1,
-    borderLeftWidth: s(4),
-    borderRadius: Zaokraglenia.s,
-    paddingHorizontal: Odstepy.s,
-    paddingVertical: 2,
-    overflow: 'hidden',
-  },
-  zajeteTytul: { fontSize: s(12), fontWeight: '700', color: Kolory.tekstDrugi },
-  zajetePodpis: { fontSize: s(10.5), color: Kolory.tekstSlaby },
 
   blok: {
     position: 'absolute',
-    left: SZEROKOSC_GODZIN,
-    right: Odstepy.s,
     backgroundColor: Kolory.akcentTlo,
     borderWidth: s(2),
     borderColor: Kolory.akcent,
@@ -469,7 +316,7 @@ const style = StyleSheet.create({
   krawedz: {
     position: 'absolute',
     left: 0,
-    width: SZEROKOSC_GODZIN - s(8),
+    width: SZEROKOSC_KRAWEDZI,
     textAlign: 'right',
     fontSize: s(12),
     fontWeight: '800',

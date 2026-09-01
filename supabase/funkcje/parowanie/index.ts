@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
             // Imie i nazwisko deklarowane przez mechanika. Zwykly tekst -
             // niczego nie autoryzuje, sluzy tylko za nazwe zakladanego konta.
             imie_zgloszone: tekst(cialo.imie, 120),
-            platforma: ["ios", "android", "web"].includes(String(cialo.platforma))
+            platforma: ["windows", "web"].includes(String(cialo.platforma))
               ? String(cialo.platforma)
               : "inne",
             wersja_aplikacji: tekst(cialo.wersja_aplikacji, 40),

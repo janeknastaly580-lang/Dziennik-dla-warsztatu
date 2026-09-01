@@ -4,69 +4,59 @@ Wszystko, co dało się zrobić w Supabase i w kodzie — jest zrobione i sprawd
 Tu została lista czynności wymagających Twojego konta, podpisu albo decyzji.
 
 **Nic nie jest hostowane na Twoim komputerze.** Cały system to Supabase (baza +
-funkcje brzegowe) i aplikacja na telefonach. Katalog `narzedzia/` to skrypty
+funkcje brzegowe) i aplikacja na komputerach. Katalog `narzedzia/` to skrypty
 odpalane z ręki kilka razy w życiu projektu — nie serwer.
 
 ---
 
-## 🔴 1. Zbuduj APK — 30 minut
+## 🔴 1. Zbuduj program — 15 minut
 
-To jest teraz najważniejszy krok. Build robi się **w chmurze EAS**; na Twoim
-komputerze zostaje tylko polecenie, które go zleca.
+Build robi się **w całości na Twoim komputerze**: nie ma chmury budującej,
+konta ani kolejki. Potrzebny jest Node.js 20 lub nowszy.
 
 ```bash
-cd frontend
-npx eas-cli@latest login
-npx eas-cli@latest init
-npx eas-cli@latest build --platform android --profile preview
+cd frontend; npm install; npm run eksport-web
+cd ../windows; npm install; npm run build
 ```
 
-Narzędzie nazywa się **`eas-cli`**, nie `eas`. `eas init` dopisze do `app.json`
-identyfikator projektu EAS — to jedyna zmiana, jaką robi.
+W `windows/dist/` powstają dwa pliki:
 
-Stan projektu przed buildem jest czysty: `npx expo-doctor` → **21/21 sprawdzeń
-przeszło**. Jeśli kiedyś coś dołożysz, uruchom go ponownie przed buildem.
-
-`preview` daje plik **.apk** do zainstalowania wprost na telefonach warsztatu
-(profil jest już w `eas.json`). Po zakończeniu EAS poda link do pobrania.
-
-### Dlaczego nie Expo Go
-
-Trzy zabezpieczenia działają **wyłącznie we własnym buildzie**:
-
-| Co | Dlaczego Expo Go nie wystarcza |
+| Plik | Do czego |
 |---|---|
-| Szyfrowanie lokalnej bazy (SQLCipher) | to natywna opcja kompilacji `expo-sqlite` |
-| Wyłączenie kopii do iCloud / Google Drive | wtyczka działa przy `prebuild`, nie w Expo Go |
-| Zablokowane uprawnienia aparatu i lokalizacji | to wpisy w manifeście |
+| `Warsztat-2.0.0-x64.exe` | instalator — to rozdajesz mechanikom |
+| `Warsztat-2.0.0-przenosny.exe` | wersja bez instalacji, np. na pendrive |
 
-W Expo Go baza klientów byłaby nieszyfrowana i wylądowałaby w prywatnej chmurze
-mechanika. Używaj go wyłącznie do własnych prób, nigdy z prawdziwymi danymi.
+Pełna instrukcja z wymaganiami i listą typowych potknięć:
+**[BUILD-WINDOWS.md](BUILD-WINDOWS.md)**.
+
+### Dlaczego nie sam podgląd w przeglądarce
+
+Dwa zabezpieczenia działają **wyłącznie w zbudowanym programie**:
+
+| Co | Dlaczego przeglądarka nie wystarcza |
+|---|---|
+| Szyfrowanie lokalnej bazy (SQLCipher) | przeglądarkowy SQLite nie ma szyfrowania |
+| Klucz i token w DPAPI | przeglądarka ma tylko `localStorage`, czytelny dla każdego |
+
+W przeglądarce baza klientów leżałaby otwartym tekstem w profilu przeglądarki.
+`npm run web` służy wyłącznie do oglądania interfejsu, nigdy do pracy
+z prawdziwymi danymi.
 
 ### Weryfikacja po zbudowaniu
 
-**Android** — na gotowym `.apk`:
+Uruchom program, przejdź parowanie i sprawdź, czy dane naprawdę są zaszyfrowane:
 
-```bash
-aapt2 dump xmltree app.apk --file AndroidManifest.xml | findstr allowBackup
+```powershell
+Get-Content "$env:APPDATA\Warsztat\warsztat.db" -Encoding Byte -TotalCount 16
 ```
 
-Musi być `android:allowBackup=false`. *(Na poziomie konfiguracji już
-sprawdzone: `expo config --type introspect` pokazuje `allowBackup: 'false'`,
-`fullBackupContent: 'false'` i `dataExtractionRules`.)*
+Pierwsze bajty **nie mogą** układać się w napis `SQLite format 3` — jeśli się
+układają, baza jest nieszyfrowana i program działa w trybie podglądu.
+Sprawdź też `%APPDATA%\Warsztat\klucze.json`: mają tam być same ciągi base64,
+bez żadnej czytelnej wartości.
 
-**iOS** — po `npx expo prebuild -p ios` otwórz `ios/<nazwa>/AppDelegate.swift`
-i sprawdź, czy w `didFinishLaunchingWithOptions` jest blok z komentarzem
-`warsztat-a12-bez-kopii`. Jeśli wtyczka wypisała ostrzeżenie „Nie rozpoznano
-AppDelegate", wklej ręcznie na początku tej funkcji:
-
-```swift
-if var katalogDanych = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-  var wartosci = URLResourceValues()
-  wartosci.isExcludedFromBackup = true
-  try? katalogDanych.setResourceValues(wartosci)
-}
-```
+*(Sprawdzone przy przygotowaniu tej wersji: nagłówek pliku bazy to losowe
+bajty, a wpisana treść wizyty nie jest w pliku widoczna.)*
 
 ---
 
@@ -86,27 +76,27 @@ npm run zaproszenie -- "Warsztat u Kowalskiego" "Jan Kowalski" --prefiks WK --dn
 Przebieg u klienta — **bez Twojego udziału po przekazaniu kodu**:
 
 ```
-1. Właściciel instaluje APK, otwiera aplikację
+1. Właściciel instaluje program, otwiera go
 2. Dotyka „Mam kod zaproszenia", wpisuje kod
    → aplikacja zakłada warsztat i jego konto ADMINISTRATORA
 3. Ustawia dowolne własne hasło
-4. Mechanik uruchamia aplikację na swoim telefonie, wpisuje SWOJE
+4. Mechanik uruchamia aplikację na swoim komputerze, wpisuje SWOJE
    imię i nazwisko i dotyka „Poproś o dostęp"
 5. Właściciel: ikona klucza ⚿ → widzi na liście imię i nazwisko mechanika
    → klika „Zatwierdź". Niczego nie wpisuje, konta nie zakłada
-6. Telefon mechanika w kilka sekund prosi o ustawienie własnego hasła
+6. Komputer mechanika w kilka sekund prosi o ustawienie własnego hasła
 ```
 
 Kod zaproszenia jest **jednorazowy**. Kto go użyje, zostaje administratorem
 tego warsztatu — przekazuj go tak, jak przekazujesz hasło.
 
 **Administrator jest dokładnie jeden na warsztat.** Pilnuje tego indeks
-unikalny w bazie, nie tylko interfejs. Każdy zatwierdzony telefon dostaje rolę
-„mechanik". Nie da się też zablokować samego siebie ani odciąć telefonu,
+unikalny w bazie, nie tylko interfejs. Każdy zatwierdzony komputer dostaje rolę
+„mechanik". Nie da się też zablokować samego siebie ani odciąć komputera,
 na którym się właśnie pracuje — warsztat nie zostanie bez nikogo, kto może
 wpuścić ludzi z powrotem.
 
-**Pierwszą synchronizację rób po Wi-Fi** — wtedy telefon ściąga większą paczkę.
+**Pierwszą synchronizację rób po Wi-Fi** — wtedy komputer ściąga większą paczkę.
 
 ---
 
@@ -114,10 +104,10 @@ wpuścić ludzi z powrotem.
 
 Ten test decyduje, czy wolno wdrożyć system u klienta. Wykonaj dokładnie:
 
-1. Sparuj telefon, ustaw hasło, sprawdź że widzisz klientów.
+1. Sparuj komputer, ustaw hasło, sprawdź że widzisz klientów.
 2. Włącz **tryb samolotowy**.
 3. **Zabij aplikację** (usuń z listy zadań, nie tylko zminimalizuj).
-4. Odczekaj **2 godziny** (albo przesuń zegar telefonu do przodu).
+4. Odczekaj **2 godziny** (albo przesuń zegar komputera do przodu).
 5. Otwórz aplikację.
 
 | Co widzisz | Werdykt |
@@ -156,23 +146,25 @@ cd narzedzia && npm run skanuj
 
 ---
 
-## 🔴 5. Wymuś blokadę ekranu na telefonach *(ryzyko A4 i A5)*
+## 🔴 5. Wymuś blokadę ekranu na komputerach *(ryzyko A4 i A5)*
 
 Dwa powody, oba wystarczające same z siebie:
 
-1. Lokalna baza jest szyfrowana SQLCipherem, a klucz leży w Keychain /
-   Keystore. **Keystore chroni klucz tylko wtedy, gdy telefon ma ustawiony PIN
-   lub odcisk palca.** Bez tego cała warstwa szyfrowania jest do obejścia.
+1. Lokalna baza jest szyfrowana SQLCipherem, a klucz leży w DPAPI Windows.
+   **DPAPI chroni klucz tylko tyle, ile chronione jest konto Windows — czyli
+   tylko wtedy, gdy konto ma hasło.** Bez tego cała warstwa szyfrowania jest
+   do obejścia.
 2. Aplikacja **nie blokuje się już sama po 5 minutach bezczynności ani przy
    przejściu w tło** (zmiana na życzenie warsztatu — mechanicy wpisywali hasło
    kilkanaście razy dziennie i zaczynali ustawiać hasła jednoznakowe). Hasło
-   jest pytane raz, przy uruchomieniu aplikacji. Odblokowany telefon zostawiony
+   jest pytane raz, przy uruchomieniu programu. Odblokowany komputer zostawiony
    na warsztacie pokazuje więc dane klientów, dopóki nie zablokuje się ekran
-   samego telefonu.
+   Windows.
 
-Na każdym telefonie służbowym ustaw kod blokady, jak najkrótszy czas do
-automatycznego wygaszenia ekranu i włącz biometrię. To już nie jest dobra
-praktyka, tylko warunek działania modelu bezpieczeństwa.
+Na każdym komputerze służbowym: osobne konto Windows dla każdego mechanika
+z hasłem, wygaszacz ekranu z hasłem po możliwie krótkim czasie i włączony
+BitLocker. To już nie jest dobra praktyka, tylko warunek działania modelu
+bezpieczeństwa.
 
 ---
 
@@ -277,18 +269,22 @@ wszystkich".
 
 - **Wersja webowa jako produkt.** `npm run web` działa i pokazuje cały
   interfejs na `http://localhost:8081` — służy do oglądania i pokazywania
-  aplikacji, nie do pracy warsztatu. W przeglądarce nie istnieje
-  Keychain/Keystore ani SQLCipher, więc token urządzenia, hasło i klucz
-  szyfrowania bazy leżą tam w zwykłym `localStorage`. Aplikacja mówi o tym
-  pomarańczowym paskiem przez cały czas. Do warsztatu idzie APK/IPA.
+  aplikacji, nie do pracy warsztatu. W przeglądarce nie istnieje ani DPAPI,
+  ani SQLCipher, więc token urządzenia, hasło i klucz szyfrowania bazy leżą tam
+  w zwykłym `localStorage`. Aplikacja mówi o tym pomarańczowym paskiem przez
+  cały czas. Do warsztatu idzie zbudowany program.
 - **Panel administratora na Twoim komputerze.** Zarządzanie dostępem żyje
   w aplikacji, pod rolą `administrator`. Nic nie musi być uruchomione, żeby
   warsztat pracował.
-- **Detekcja root/jailbreak** — na zrootowanym telefonie każde zabezpieczenie
-  po stronie aplikacji da się obejść. Realną obroną jest wąskie okno danych
-  (90 dni), szyfrowana baza i możliwość odcięcia telefonu zdalnie.
-- **Zadanie w tle wysyłające kolejkę** — przy kolejce tekstowej (brak zdjęć)
-  i synchronizacji co 2 minuty nie daje korzyści, a dokłada uprawnień
-  i zużycia baterii.
+- **Wykrywanie, czy mechanik ma prawa administratora Windows** — na komputerze,
+  na którym ktoś jest administratorem systemu, każde zabezpieczenie po stronie
+  programu da się obejść. Realną obroną jest wąskie okno danych (90 dni),
+  szyfrowana baza i możliwość odcięcia stanowiska zdalnie.
+- **Usługa w tle wysyłająca kolejkę** — przy kolejce tekstowej (brak zdjęć)
+  i synchronizacji co 45 sekund nie daje korzyści, a dokłada uprawnień
+  i jeden proces więcej do pilnowania.
+- **Automatyczna aktualizacja programu** — wymagałaby serwera z podpisanymi
+  paczkami; w warsztacie na kilka stanowisk nowy plik `.exe` rozchodzi się
+  szybciej (patrz [BUILD-WINDOWS.md](BUILD-WINDOWS.md)).
 - **PowerSync i Cloudflare R2** — niepotrzebne. Synchronizacja jest własna,
   magazyn plików odpadł razem ze zdjęciami. Dwóch sub-procesorów mniej.

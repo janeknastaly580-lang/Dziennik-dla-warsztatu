@@ -10,15 +10,15 @@
  *      na miejscu. Dzieki temu kolejka zawsze sie oprozni i nigdy nie
  *      zatrzyma sie na jednym zepsutym rekordzie.
  *  D7  Wysylka idzie paczkami, jedna naraz, z minimalna przerwa miedzy
- *      automatycznymi cyklami. Dziesiec telefonow wracajacych jednoczesnie
+ *      automatycznymi cyklami. Dziesiec komputerow wracajacych jednoczesnie
  *      do sieci nie zaleje lacza.
  *  A3  Po pobraniu danych lokalna baza jest przycinana do tego samego okna,
  *      ktore stosuje serwer.
- *  A4  Telefon, ktory nie polaczyl sie z serwerem dluzej niz okno offline
- *      warsztatu, kasuje swoja lokalna baze. Skradziony telefon juz nigdy
+ *  A4  Komputer, ktory nie polaczyl sie z serwerem dluzej niz okno offline
+ *      warsztatu, kasuje swoja lokalna baze. Skradziony komputer juz nigdy
  *      sie nie polaczy, wiec sam sie wyczysci.
  *  A6  Odpowiedz "zablokowane" albo "wyczysc" konczy sie natychmiastowym
- *      skasowaniem danych z telefonu.
+ *      skasowaniem danych z komputera.
  */
 import {
   BladDostepu, BladSieci, PowodOdciecia, ZmianaDoWyslania,
@@ -46,7 +46,7 @@ export type StanSynchronizacji = {
   /** D5 - najstarsza pozycja; jesli czeka dobe, cos jest nie tak. */
   najstarszaCzeka: string | null;
   blad: string | null;
-  /** A6 - dostep odebrany; dane zostaly juz z telefonu skasowane. */
+  /** A6 - dostep odebrany; dane zostaly juz z komputera skasowane. */
   odciecie: { kod: PowodOdciecia; powod?: string } | null;
   /** Administrator kazal ustawic nowe haslo. */
   resetHasla: boolean;
@@ -135,7 +135,7 @@ export async function sprawdzWygasniecieOffline(): Promise<boolean> {
     ustawStan({
       odciecie: {
         kod: 'WYCZYSC',
-        powod: `Telefon nie polaczyl sie z serwerem od ponad ${dni} dni. `
+        powod: `Komputer nie polaczyl sie z serwerem od ponad ${dni} dni. `
           + 'Dane zostaly skasowane. Popros administratora o ponowne przyznanie dostepu.',
       },
     });

@@ -103,10 +103,10 @@ export type OdpowiedzZgloszenia = {
 };
 
 /**
- * Prosba o dostep. `imie` wpisuje SAM MECHANIK na swoim telefonie - z tego
+ * Prosba o dostep. `imie` wpisuje SAM MECHANIK na swoim komputerze - z tego
  * powstanie potem jego konto, wiec pisownie nazwiska ustala osoba, ktora zna
  * ja najlepiej. Samo imie niczego nie autoryzuje: dostep i tak przyznaje
- * administrator, a token odbiera wylacznie ten telefon, ktory ma sekret.
+ * administrator, a token odbiera wylacznie ten komputer, ktory ma sekret.
  */
 export function zglosUrzadzenie(dane: {
   platforma: string; nazwa_urzadzenia: string; imie: string;
@@ -216,7 +216,7 @@ export function sprawdzStan(token: string) {
 /*                                                                        */
 /*  Administrator to mechanik z rola "administrator" - nie ma zadnego     */
 /*  osobnego panelu ani serwera. Moze dokladnie dwie rzeczy wiecej:       */
-/*  przyznac dostep telefonowi i odebrac dostep. Uprawnienia sprawdza     */
+/*  przyznac dostep komputerowi i odebrac dostep. Uprawnienia sprawdza     */
 /*  funkcja brzegowa ORAZ, niezaleznie od niej, kazda funkcja w bazie.    */
 /* ====================================================================== */
 
@@ -242,7 +242,7 @@ export type MechanikAdmina = {
 
 export type OczekujaceUrzadzenie = {
   kod: string;
-  /** Imie i nazwisko wpisane przez mechanika na jego telefonie. */
+  /** Imie i nazwisko wpisane przez mechanika na jego komputerze. */
   imie: string | null;
   nazwa: string | null;
   platforma: string | null;
@@ -270,7 +270,7 @@ export function dodajMechanika(token: string, imie: string, rola: Rola = 'mechan
 }
 
 /**
- * Zatwierdzenie telefonu jednym klikiem.
+ * Zatwierdzenie komputera jednym klikiem.
  *
  * Administrator nie wpisuje niczego - podaje tylko kod wiersza, ktory dotknal.
  * Konto mechanika zaklada sie po stronie serwera, z imienia podanego przez
@@ -285,7 +285,7 @@ export function zatwierdzUrzadzenie(token: string, kod: string) {
 /**
  * Starsza droga: kod + recznie wskazane konto mechanika. Aplikacja jej juz
  * nie uzywa (zostala zastapiona przez `zatwierdzUrzadzenie`), ale serwer
- * nadal ja obsluguje - na telefonach moze jeszcze chodzic poprzednia wersja.
+ * nadal ja obsluguje - na komputerach moze jeszcze chodzic poprzednia wersja.
  */
 export function przyznajDostep(token: string, kod: string, mechanikId: string) {
   return wywolaj('admin', {
