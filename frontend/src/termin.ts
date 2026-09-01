@@ -105,6 +105,12 @@ export function etykietaDnia(data: string): string {
   return `${DNI[d.getDay()]} ${d.getDate()} ${MIESIACE[d.getMonth()]}`;
 }
 
+/** '2026-09-02' -> 'sr 2' - naglowek kolumny w kalendarzu kilku dni. */
+export function etykietaKolumny(data: string): string {
+  const d = naDate(data);
+  return `${DNI[d.getDay()]} ${d.getDate()}`;
+}
+
 /** '2026-09-02' -> 'sr 2.09' */
 export function etykietaKrotka(data: string): string {
   const d = naDate(data);
@@ -167,6 +173,36 @@ export const tenSamMiesiac = (a: string, b: string): boolean =>
 
 /** Numer dnia do wpisania w kratke siatki miesiaca. */
 export const dzienMiesiaca = (data: string): number => naDate(data).getDate();
+
+/**
+ * Zakres dni w naglowku kalendarza: 'wt 1 - pt 4 wrzesnia'. Nazwa miesiaca
+ * pada raz, jesli caly zakres siedzi w jednym miesiacu - inaczej po obu
+ * stronach mysnika.
+ */
+export function etykietaZakresu(od: string, do_: string): string {
+  if (od === do_) return etykietaDnia(od);
+
+  const pierwszy = naDate(od);
+  const ostatni = naDate(do_);
+  const tenSam = pierwszy.getMonth() === ostatni.getMonth()
+    && pierwszy.getFullYear() === ostatni.getFullYear();
+
+  const poczatek = tenSam
+    ? `${DNI[pierwszy.getDay()]} ${pierwszy.getDate()}`
+    : etykietaDnia(od);
+  return `${poczatek} - ${etykietaDnia(do_)}`;
+}
+
+/** Kolejne dni poczynajac od podanego: ['2026-09-01', '2026-09-02', ...]. */
+export function kolejneDni(od: string, ile: number): string[] {
+  return Array.from({ length: Math.max(1, ile) }, (_, i) => przesunDzien(od, i));
+}
+
+/** Minuty od polnocy dla biezacej chwili - do linii "teraz" na siatce. */
+export function terazMinuty(): number {
+  const teraz = new Date();
+  return teraz.getHours() * 60 + teraz.getMinutes();
+}
 
 /** 'Dzis' / 'Jutro' / 'Wczoraj' - albo nic, gdy dzien jest dalej. */
 export function wzgledemDzis(data: string): string | null {

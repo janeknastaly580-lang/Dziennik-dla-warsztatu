@@ -1,10 +1,15 @@
 /**
- * KALENDARZ - grafik warsztatu, dzien po dniu.
+ * KALENDARZ - grafik warsztatu, cztery dni naraz.
  *
- * Pokazuje wizyty tak, jak zostaly wpisane: na wysokosci odpowiadajacej
- * godzinom i czasowi trwania, w kolorze swojego statusu. Dotkniecie bloku
- * otwiera zgloszenie, a przycisk na ekranie zgloszenia prowadzi z powrotem
- * tutaj, dokladnie na jego godzine.
+ * Pokazuje wizyty tak, jak zostaly wpisane: w kolumnie swojego dnia, na
+ * wysokosci odpowiadajacej godzinom i czasowi trwania, w kolorze swojego
+ * statusu. Dotkniecie bloku otwiera zgloszenie, a przycisk na ekranie
+ * zgloszenia prowadzi z powrotem tutaj, dokladnie na jego godzine.
+ *
+ * Strzalki w pasku przesuwaja CALY widok o cztery dni - tyle, ile widac
+ * naraz, wiec kolejne klikniecia przechodza przez grafik bez powtarzania
+ * tych samych dni. Dotkniecie zakresu rozwija siatke miesiaca i pozwala
+ * skoczyc na dowolna date.
  *
  * D1: czyta wylacznie lokalna baze komputera, wiec grafik jest w warsztacie
  * dostepny tak samo bez zasiegu.
@@ -13,36 +18,47 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { usePelnaSzerokosc } from '../komponenty/KolumnaEkranu';
 import PasekDnia from '../komponenty/PasekDnia';
-import SiatkaDnia from '../komponenty/SiatkaDnia';
-import { wizytyDnia } from '../dane/repozytorium';
+import SiatkaDni from '../komponenty/SiatkaDni';
+import { wizytyZakresu } from '../dane/repozytorium';
 import { Kolory } from '../motyw';
-import { dzisiaj, naMinuty } from '../termin';
+import { dzisiaj, kolejneDni, naMinuty } from '../termin';
 import type { Wizyta } from '../typy';
 
-/** Gdy dzien jest pusty, widok staje na poczatku dnia pracy. */
+/** Ile dni stoi obok siebie - i o tyle samo przesuwaja strzalki. */
+const DNI_W_WIDOKU = 4;
+/** Gdy w widoku nie ma zadnej wizyty, widok staje na poczatku dnia pracy. */
 const DOMYSLNA_GODZINA = 8 * 60;
 
 export default function EkranKalendarza() {
+  // Cztery dni obok siebie potrzebuja calego okna, a nie waskiej kolumny.
+  usePelnaSzerokosc();
+
   const router = useRouter();
   const parametry = useLocalSearchParams<{ data?: string; wizyta?: string }>();
   const wyrozniona = String(parametry.wizyta ?? '') || null;
 
-  const [data, setData] = useState(
+  /* Pierwszy dzien widoku. Wejscie z ekranu zgloszenia ustawia go na dzien
+     tej wizyty, zeby byla widoczna od razu. */
+  const [poczatek, setPoczatek] = useState(
     () => String(parametry.data ?? '').slice(0, 10) || dzisiaj(),
   );
   const [wizyty, setWizyty] = useState<Wizyta[]>([]);
 
+  const dni = useMemo(() => kolejneDni(poczatek, DNI_W_WIDOKU), [poczatek]);
+  const ostatni = dni[dni.length - 1];
+
   const wczytaj = useCallback(async () => {
-    setWizyty(await wizytyDnia(data));
-  }, [data]);
+    setWizyty(await wizytyZakresu(dni[0], ostatni));
+  }, [dni, ostatni]);
 
   // Odczyt z lokalnej bazy jest natychmiastowy, wiec powtarzamy go przy
   // kazdym wejsciu - takze po powrocie ze zmienionej wizyty.
   useFocusEffect(useCallback(() => { wczytaj(); }, [wczytaj]));
 
   /* Widok staje na wizycie, z ktorej mechanik tu przyszedl; bez wskazanej -
-     na pierwszej wizycie dnia. */
+     na pierwszej wizycie z tych czterech dni. */
   const przewinDo = useMemo(() => {
     const cel = wizyty.find((w) => w.id === wyrozniona) ?? wizyty[0];
     return cel ? naMinuty(cel.godzina_od) : DOMYSLNA_GODZINA;
@@ -52,10 +68,15 @@ export default function EkranKalendarza() {
     <View style={style.ekran}>
       <Stack.Screen options={{ title: 'Kalendarz' }} />
 
-      <PasekDnia data={data} onZmiana={setData} />
+      <PasekDnia
+        data={poczatek}
+        doData={ostatni}
+        krok={DNI_W_WIDOKU}
+        onZmiana={setPoczatek}
+      />
 
-      <SiatkaDnia
-        dzien={data}
+      <SiatkaDni
+        dni={dni}
         wizyty={wizyty}
         przewinDo={przewinDo}
         wyrozniona={wyrozniona}

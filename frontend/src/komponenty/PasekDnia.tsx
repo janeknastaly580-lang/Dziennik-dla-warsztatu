@@ -1,10 +1,11 @@
 /**
- * Pasek z dniem, ktory kalendarz pokazuje.
+ * Pasek z dniem (albo zakresem dni), ktory kalendarz pokazuje.
  *
- * Strzalki przesuwaja o jeden dzien, a dotkniecie nazwy dnia rozwija siatke
- * miesiaca - stad skok na dowolna date, takze o kilka miesiecy dalej, bez
- * przewijania dzien po dniu. Kropka pod numerem znaczy, ze na ten dzien jest
- * juz zaplanowana jakas wizyta.
+ * Strzalki przesuwaja widok o `krok` dni - w kalendarzu warsztatu o cale
+ * cztery, czyli o tyle, ile widac naraz; przy wyborze terminu o jeden.
+ * Dotkniecie nazwy rozwija siatke miesiaca - stad skok na dowolna date,
+ * takze o kilka miesiecy dalej, bez przewijania dzien po dniu. Kropka pod
+ * numerem znaczy, ze na ten dzien jest juz zaplanowana jakas wizyta.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,15 +14,21 @@ import { dniZWizytami } from '../dane/repozytorium';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
 import {
   DNI_TYGODNIA, dzienMiesiaca, dzisiaj, etykietaDnia, etykietaMiesiaca,
-  przesunDzien, przesunMiesiac, siatkaMiesiaca, tenSamMiesiac, wzgledemDzis,
+  etykietaZakresu, przesunDzien, przesunMiesiac, siatkaMiesiaca, tenSamMiesiac,
+  wzgledemDzis,
 } from '../termin';
 import { CEL_DOTYKU, s } from '../uklad';
 
 export default function PasekDnia({
-  data, onZmiana,
+  data, onZmiana, doData, krok = 1,
 }: {
+  /** Pierwszy dzien widoku - to on zmienia sie strzalkami. */
   data: string;
   onZmiana: (data: string) => void;
+  /** Ostatni dzien widoku; podany, gdy kalendarz pokazuje kilka dni naraz. */
+  doData?: string;
+  /** O ile dni przesuwaja strzalki. */
+  krok?: number;
 }) {
   const [rozwiniety, setRozwiniety] = useState(false);
   const [miesiac, setMiesiac] = useState(data);
@@ -29,7 +36,11 @@ export default function PasekDnia({
 
   const dni = useMemo(() => siatkaMiesiaca(miesiac), [miesiac]);
   const dzis = dzisiaj();
-  const podpis = wzgledemDzis(data);
+  const zakres = doData && doData !== data;
+  const tytul = zakres ? etykietaZakresu(data, doData) : etykietaDnia(data);
+  // Przy kilku dniach naraz "Dzis" stoi juz nad wlasciwa kolumna siatki -
+  // powtarzanie go w pasku tylko myliloby, ktorego dnia dotyczy.
+  const podpis = zakres ? null : wzgledemDzis(data);
 
   /* Kropki pod dniami - tylko dla miesiaca, ktory faktycznie widac. */
   useEffect(() => {
@@ -55,9 +66,9 @@ export default function PasekDnia({
     <View style={style.pasek}>
       <View style={style.rzad}>
         <Pressable
-          onPress={() => onZmiana(przesunDzien(data, -1))}
+          onPress={() => onZmiana(przesunDzien(data, -krok))}
           accessibilityRole="button"
-          accessibilityLabel="Poprzedni dzien"
+          accessibilityLabel={krok > 1 ? 'Poprzednie dni' : 'Poprzedni dzien'}
           hitSlop={10}
           style={({ pressed }) => [style.strzalka, pressed && style.strzalkaWcisnieta]}
         >
@@ -67,20 +78,20 @@ export default function PasekDnia({
         <Pressable
           onPress={przelacz}
           accessibilityRole="button"
-          accessibilityLabel={`Wybierz date, teraz ${etykietaDnia(data)}`}
+          accessibilityLabel={`Wybierz date, teraz ${tytul}`}
           style={({ pressed }) => [style.srodek, pressed && style.srodekWcisniety]}
         >
-          <Text style={style.dzien}>
-            {etykietaDnia(data)}
+          <Text style={style.dzien} numberOfLines={1}>
+            {tytul}
             <Text style={style.znacznik}>{rozwiniety ? '  ˄' : '  ˅'}</Text>
           </Text>
           {podpis ? <Text style={style.podpis}>{podpis}</Text> : null}
         </Pressable>
 
         <Pressable
-          onPress={() => onZmiana(przesunDzien(data, 1))}
+          onPress={() => onZmiana(przesunDzien(data, krok))}
           accessibilityRole="button"
-          accessibilityLabel="Nastepny dzien"
+          accessibilityLabel={krok > 1 ? 'Nastepne dni' : 'Nastepny dzien'}
           hitSlop={10}
           style={({ pressed }) => [style.strzalka, pressed && style.strzalkaWcisnieta]}
         >

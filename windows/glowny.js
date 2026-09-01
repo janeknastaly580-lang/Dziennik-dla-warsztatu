@@ -244,11 +244,12 @@ function podlaczMost() {
 
 function utworzOkno() {
   const okno = new BrowserWindow({
-    // Interfejs jest zaprojektowany pod waski ekran telefonu (9:16), wiec
-    // okno startuje w tych proporcjach zamiast rozlewac sie na caly monitor.
-    width: 460,
-    height: 880,
-    minWidth: 380,
+    // Ekrany robocze sa zaprojektowane pod waska kolumne (9:16) i tyle
+    // dostaja - ale kalendarz pokazuje cztery dni obok siebie i potrzebuje
+    // szerokosci, wiec okno startuje na tyle duze, zeby zmiescil sie grafik.
+    width: 1180,
+    height: 860,
+    minWidth: 420,
     minHeight: 620,
     show: false,
     title: 'Warsztat',

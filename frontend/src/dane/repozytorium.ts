@@ -140,6 +140,23 @@ export async function wizytyDnia(data: string, pomin?: string | null): Promise<W
 }
 
 /**
+ * Wizyty z kilku kolejnych dni - to, co rysuje kalendarz warsztatu.
+ * Zakres jest domkniety z obu stron ('2026-09-01' .. '2026-09-04').
+ */
+export async function wizytyZakresu(od: string, do_: string): Promise<Wizyta[]> {
+  const db = await baza();
+  return db.getAllAsync<Wizyta>(`
+    SELECT w.*, k.nazwa AS klient_nazwa
+    FROM wizyty w LEFT JOIN klienci k ON k.id = w.klient_id
+    WHERE w.usuniete_o IS NULL
+      AND w.data_wizyty BETWEEN ? AND ?
+      AND w.godzina_od IS NOT NULL
+      AND w.godzina_do IS NOT NULL
+    ORDER BY w.data_wizyty, w.godzina_od
+  `, od, do_);
+}
+
+/**
  * Dni z zaplanowana wizyta w podanym zakresie - kropki pod dniami w siatce
  * miesiaca. Zakres to zwykle jeden widoczny miesiac, wiec zapytanie jest tanie.
  */

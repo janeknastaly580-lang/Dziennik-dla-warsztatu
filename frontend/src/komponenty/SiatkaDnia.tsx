@@ -37,11 +37,22 @@ const GODZINY = Array.from({ length: 24 }, (_, i) => i);
 /** Klucz pozycji, ktora nie jest wizyta, tylko wlasnie wybieranym terminem. */
 const REZERWACJA = '@rezerwacja';
 
-type Pozycja = { id: string; od: number; koniec: number; wizyta?: Wizyta };
-type Ulozona = Pozycja & { kolumna: number; kolumn: number };
+export type Pozycja = { id: string; od: number; koniec: number; wizyta?: Wizyta };
+export type Ulozona = Pozycja & { kolumna: number; kolumn: number };
 
 /** Gdzie i jak szeroko rysowac blok - to samo dla wizyt i dla rezerwacji. */
 export type PolozenieBloku = { left: number; width: number };
+
+/** Wizyta sprowadzona do dwoch liczb: poczatku i konca w minutach doby. */
+export function pozycjaWizyty(wizyta: Wizyta): Pozycja {
+  const od = naMinuty(wizyta.godzina_od);
+  return {
+    id: wizyta.id,
+    od,
+    koniec: Math.max(naMinuty(wizyta.godzina_do), od + MIN_DLUGOSC),
+    wizyta,
+  };
+}
 
 /**
  * Rozklada wizyty na kolumny: kazda dostaje pierwsza wolna kolumne wsrod
@@ -49,7 +60,7 @@ export type PolozenieBloku = { left: number; width: number };
  * sie po najpozniejszym dotychczasowym koncu - wtedy szerokosc wraca do
  * calej siatki.
  */
-function ulozPozycje(wejscie: Pozycja[]): Ulozona[] {
+export function ulozPozycje(wejscie: Pozycja[]): Ulozona[] {
   const pozycje = [...wejscie].sort((a, b) => a.od - b.od || a.koniec - b.koniec);
 
   const wynik: Ulozona[] = [];
@@ -124,15 +135,7 @@ export default function SiatkaDnia({
   }, [dzien, przewinDo]);
 
   const ulozone = useMemo(() => {
-    const pozycje: Pozycja[] = wizyty.map((wizyta) => {
-      const od = naMinuty(wizyta.godzina_od);
-      return {
-        id: wizyta.id,
-        od,
-        koniec: Math.max(naMinuty(wizyta.godzina_do), od + MIN_DLUGOSC),
-        wizyta,
-      };
-    });
+    const pozycje: Pozycja[] = wizyty.map(pozycjaWizyty);
     if (rezerwacjaOd !== null && rezerwacjaOd !== undefined
       && rezerwacjaDo !== null && rezerwacjaDo !== undefined) {
       pozycje.push({ id: REZERWACJA, od: rezerwacjaOd, koniec: rezerwacjaDo });

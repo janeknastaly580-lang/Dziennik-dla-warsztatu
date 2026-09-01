@@ -318,11 +318,16 @@ Wymagają `narzedzia/.env` z kluczem `service_role` (wzór w `.env.example`).
 
 # 3. Interfejs aplikacji
 
-Cały interfejs jest projektowany pod **wąskie okno** w proporcjach około 9:16 —
-wysokie i wąskie. Odpowiada za to `frontend/src/uklad.ts` oraz komponent
-`KolumnaEkranu`, który owija całą nawigację. Okno programu startuje dokładnie
-w tych proporcjach (460 × 880), więc treść zajmuje je w całości; dopiero po
-rozciągnięciu okna kolumna przestaje rosnąć i staje na środku.
+Ekrany robocze są projektowane pod **wąską kolumnę** w proporcjach około 9:16 —
+wysoką i wąską. Odpowiada za to `frontend/src/uklad.ts` oraz komponent
+`KolumnaEkranu`, który owija całą nawigację: gdy okno jest szersze niż 9/16
+swojej wysokości, kolumna przestaje rosnąć i staje na środku, na spokojnym tle.
+
+**Wyjątek: kalendarz.** Cztery dni obok siebie to widok tabelaryczny, któremu
+szerokość służy — ten ekran prosi o całe okno hakiem `usePelnaSzerokosc()`
+i oddaje je z powrotem, gdy mechanik wejdzie w zgłoszenie. Dlatego okno
+programu startuje w rozmiarze 1180 × 860: mieści grafik, a ekrany robocze i tak
+zostają wąską kolumną.
 
 **Skala** — wszystkie odstępy, czcionki i zaokrąglenia są liczone względem
 okna referencyjnego 360 × 640 dp przez funkcję `s()`, z ograniczeniem
@@ -506,13 +511,14 @@ frontend/
     │   ├── ustawienia.tsx    znacznik kolejki, wylogowanie i wyczyszczenie
     │   ├── klient/[id].tsx   WIDOK PROFILU — duży „DODAJ", zakładki, historia
     │   ├── klient/nowy.tsx   formularz + ostrzeżenie o duplikacie numeru
-    │   ├── kalendarz.tsx     grafik warsztatu, dzień po dniu
+    │   ├── kalendarz.tsx     grafik warsztatu — cztery dni obok siebie
     │   ├── wizyta/nowa.tsx   auto + tytuł + opis + priorytet + termin
     │   └── wizyta/[id].tsx   szczegóły, zmiana statusu
     └── komponenty/
         ├── EkranParowania.tsx     kod dla administratora + kod zaproszenia
         ├── EkranBlokady.tsx       ustawienie hasła i odblokowanie
-        ├── SiatkaDnia.tsx         doba z wizytami — kalendarz i wybór terminu
+        ├── SiatkaDni.tsx          kilka dni obok siebie — ekran kalendarza
+        ├── SiatkaDnia.tsx         jedna doba z wizytami — wybór terminu
         ├── WyborTerminu.tsx       czas trwania wizyty wybierany palcem
         ├── KafelekWizyty.tsx      DUŻY vs MAŁY kafelek zależnie od statusu
         └── … (KafelekKlienta, ZakladkiAut, Formularz, Stany, Potwierdzenie)
