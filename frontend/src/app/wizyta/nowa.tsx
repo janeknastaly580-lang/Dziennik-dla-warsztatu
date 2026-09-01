@@ -9,6 +9,9 @@
  *               Adama", moze byc jeden znak albo kilka linijek.
  *   2. TYTUL  - krotka nazwa zgloszenia (jedyne pole wymagane).
  *   3. OPIS   - szczegoly usterki.
+ *   4. TERMIN - dzien i godziny wybierane palcem na siatce kalendarza.
+ *               Ustawiony z gory na najblizsza godzine, wiec mechanik,
+ *               ktoremu termin jest obojetny, po prostu go nie dotyka.
  *
  * Statusu tu nie ma - kazde nowe zgloszenie startuje jako "nienaprawione".
  *
@@ -24,9 +27,11 @@ import EkranFormularza from '../../komponenty/EkranFormularza';
 import {
   KomunikatFormularza, Pole, Przycisk, Sekcja, WyborOpcji,
 } from '../../komponenty/Formularz';
+import WierszTerminu, { KalendarzTerminu } from '../../komponenty/WyborTerminu';
 import { otwartaWizytaTegoAuta, utworzWizyte } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { formatujDate } from '../../format';
+import { type Termin, domyslnyTermin } from '../../termin';
 import { Kolory, Odstepy, Zaokraglenia } from '../../motyw';
 import { s } from '../../uklad';
 import type { Priorytet, Wizyta } from '../../typy';
@@ -46,6 +51,8 @@ export default function EkranNowaWizyta() {
   const [tytul, setTytul] = useState('');
   const [opis, setOpis] = useState('');
   const [priorytet, setPriorytet] = useState<Priorytet>('normalny');
+  const [termin, setTermin] = useState<Termin>(() => domyslnyTermin());
+  const [kalendarz, setKalendarz] = useState(false);
 
   const [podobna, setPodobna] = useState<Wizyta | null>(null);
   const [zapisywanie, setZapisywanie] = useState(false);
@@ -71,7 +78,7 @@ export default function EkranNowaWizyta() {
     setZapisywanie(true);
     setBlad(null);
     try {
-      await utworzWizyte({ klient_id: idKlienta, auto, tytul, opis, priorytet });
+      await utworzWizyte({ klient_id: idKlienta, auto, tytul, opis, priorytet, termin });
       await odswiezLicznikiKolejki();
       if (router.canGoBack()) router.back();
       else router.replace(`/klient/${idKlienta}`);
@@ -79,10 +86,11 @@ export default function EkranNowaWizyta() {
       setBlad(err instanceof Error ? err.message : 'Nie udalo sie zapisac zgloszenia.');
       setZapisywanie(false);
     }
-  }, [idKlienta, auto, tytul, opis, priorytet, router]);
+  }, [idKlienta, auto, tytul, opis, priorytet, termin, router]);
 
   return (
-    <EkranFormularza>
+    <>
+      <EkranFormularza>
         <KomunikatFormularza tresc={blad} />
 
         {podobna ? (
@@ -137,6 +145,10 @@ export default function EkranNowaWizyta() {
           />
         </Sekcja>
 
+        <Sekcja tytul="TERMIN">
+          <WierszTerminu wartosc={termin} onNacisnij={() => setKalendarz(true)} />
+        </Sekcja>
+
         <View style={style.informacja}>
           <Text style={style.informacjaTekst}>
             Zgloszenie zostanie zapisane jako nienaprawione; status zmienia sie pozniej.
@@ -154,7 +166,18 @@ export default function EkranNowaWizyta() {
             wylaczony={zapisywanie}
           />
         </View>
-    </EkranFormularza>
+      </EkranFormularza>
+
+      {/* Kalendarz stoi OBOK formularza, a nie w nim - inaczej nakladka
+          przykrylaby tylko swoja sekcje zamiast calego ekranu. */}
+      {kalendarz ? (
+        <KalendarzTerminu
+          wartosc={termin}
+          onGotowe={(t) => { setTermin(t); setKalendarz(false); }}
+          onAnuluj={() => setKalendarz(false)}
+        />
+      ) : null}
+    </>
   );
 }
 

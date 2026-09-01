@@ -151,7 +151,8 @@ export async function sprawdzWygasniecieOffline(): Promise<boolean> {
 const KOLUMNY_KLIENTA = ['nazwa', 'telefon', 'email', 'adres', 'nip', 'notatki',
   'zrobione_o', 'zapisane_o', 'usuniete_o'] as const;
 const KOLUMNY_WIZYTY = ['klient_id', 'auto', 'tytul', 'opis', 'status', 'priorytet',
-  'data_wizyty', 'data_zamkniecia', 'przebieg', 'koszt', 'numer_roboczy',
+  'data_wizyty', 'godzina_od', 'godzina_do', 'data_zamkniecia', 'przebieg', 'koszt',
+  'numer_roboczy',
   'numer_oficjalny', 'naprawione_o', 'zrobione_o', 'zapisane_o', 'usuniete_o'] as const;
 
 /**

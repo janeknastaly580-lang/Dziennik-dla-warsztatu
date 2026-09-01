@@ -5,9 +5,9 @@
  *      cofnie statusu, ktory w tym czasie ustawil kolega z drugiego telefonu.
  *
  * Statusu NIE zmienia sie tutaj - od tego sa trzy duze przyciski na ekranie
- * zgloszenia. Tu poprawia sie tresc: auto, tytul, opis, priorytet, przebieg
- * i koszt. Rozdzielenie tych dwoch rzeczy trzyma karencje usuwania (30 dni od
- * oznaczenia jako naprawione) w jednym, przewidywalnym miejscu.
+ * zgloszenia. Tu poprawia sie tresc: auto, tytul, opis, priorytet, termin,
+ * przebieg i koszt. Rozdzielenie tych dwoch rzeczy trzyma karencje usuwania
+ * (30 dni od oznaczenia jako naprawione) w jednym, przewidywalnym miejscu.
  *
  * Przed zapisem pojawia sie pytanie "czy na pewno" z lista zmian.
  */
@@ -20,10 +20,14 @@ import {
   KomunikatFormularza, Pole, Przycisk, Sekcja, WyborOpcji,
 } from '../../komponenty/Formularz';
 import Potwierdzenie from '../../komponenty/Potwierdzenie';
+import WierszTerminu, { KalendarzTerminu } from '../../komponenty/WyborTerminu';
 import { Ladowanie } from '../../komponenty/Stany';
 import { pobierzWizyte, zaktualizujWizyte } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { Kolory, Odstepy } from '../../motyw';
+import {
+  type Termin, domyslnyTermin, dzisiaj, formatujTermin, takiSam, terminWizyty,
+} from '../../termin';
 import { s } from '../../uklad';
 import type { Priorytet } from '../../typy';
 
@@ -39,12 +43,14 @@ const ETYKIETY_PRIORYTETU: Record<string, string> = {
 
 type Wartosci = {
   auto: string; tytul: string; opis: string;
-  priorytet: Priorytet; przebieg: string; koszt: string;
+  priorytet: Priorytet; termin: Termin; przebieg: string; koszt: string;
 };
 
-const PUSTE: Wartosci = {
-  auto: '', tytul: '', opis: '', priorytet: 'normalny', przebieg: '', koszt: '',
-};
+/** Stan przed wczytaniem wizyty - ekran pokazuje wtedy kreciolek. */
+const puste = (): Wartosci => ({
+  auto: '', tytul: '', opis: '', priorytet: 'normalny',
+  termin: domyslnyTermin(), przebieg: '', koszt: '',
+});
 
 /** Przecinek jako separator dziesietny - tak sie pisze kwoty po polsku. */
 const naLiczbe = (t: string): number | null => {
@@ -60,10 +66,11 @@ export default function EkranEdycjiWizyty() {
   const wizytaId = String(id ?? '');
 
   const [poczatkowe, setPoczatkowe] = useState<Wartosci | null>(null);
-  const [wartosci, setWartosci] = useState<Wartosci>(PUSTE);
+  const [wartosci, setWartosci] = useState<Wartosci>(puste);
   const [zapisywanie, setZapisywanie] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
   const [pytanie, setPytanie] = useState(false);
+  const [kalendarz, setKalendarz] = useState(false);
 
   useEffect(() => {
     let aktywny = true;
@@ -78,6 +85,10 @@ export default function EkranEdycjiWizyty() {
         tytul: w.tytul ?? '',
         opis: w.opis ?? '',
         priorytet: w.priorytet ?? 'normalny',
+        // Wizyty zalozone przed kalendarzem nie maja godzin - podsuwamy
+        // domyslne w ich dniu, ale zapisuja sie dopiero, gdy ktos je ruszy.
+        termin: terminWizyty(w)
+          ?? domyslnyTermin(String(w.data_wizyty ?? '').slice(0, 10) || dzisiaj()),
         przebieg: w.przebieg === null || w.przebieg === undefined ? '' : String(w.przebieg),
         koszt: w.koszt === null || w.koszt === undefined
           ? '' : String(w.koszt).replace('.', ','),
@@ -104,6 +115,13 @@ export default function EkranEdycjiWizyty() {
         etykieta: 'Priorytet',
         z: ETYKIETY_PRIORYTETU[poczatkowe.priorytet],
         na: ETYKIETY_PRIORYTETU[wartosci.priorytet],
+      });
+    }
+    if (!takiSam(poczatkowe.termin, wartosci.termin)) {
+      opis.push({
+        etykieta: 'Termin',
+        z: formatujTermin(poczatkowe.termin),
+        na: formatujTermin(wartosci.termin),
       });
     }
     dodaj('Przebieg', poczatkowe.przebieg, wartosci.przebieg);
@@ -141,6 +159,9 @@ export default function EkranEdycjiWizyty() {
         tytul: wartosci.tytul,
         opis: wartosci.opis,
         priorytet: wartosci.priorytet,
+        data_wizyty: wartosci.termin.data,
+        godzina_od: wartosci.termin.godzinaOd,
+        godzina_do: wartosci.termin.godzinaDo,
         przebieg: naLiczbe(wartosci.przebieg),
         koszt: naLiczbe(wartosci.koszt),
       });
@@ -201,6 +222,13 @@ export default function EkranEdycjiWizyty() {
           />
         </Sekcja>
 
+        <Sekcja tytul="TERMIN">
+          <WierszTerminu
+            wartosc={wartosci.termin}
+            onNacisnij={() => setKalendarz(true)}
+          />
+        </Sekcja>
+
         <Sekcja tytul="ROZLICZENIE">
           <Pole
             etykieta="Przebieg (km)"
@@ -233,6 +261,16 @@ export default function EkranEdycjiWizyty() {
           />
         </View>
       </EkranFormularza>
+
+      {/* Kalendarz stoi OBOK formularza - patrz WyborTerminu.tsx. */}
+      {kalendarz ? (
+        <KalendarzTerminu
+          wartosc={wartosci.termin}
+          pomijanaWizyta={wizytaId}
+          onGotowe={(t) => { setWartosci((w) => ({ ...w, termin: t })); setKalendarz(false); }}
+          onAnuluj={() => setKalendarz(false)}
+        />
+      ) : null}
 
       {pytanie ? (
         <Potwierdzenie

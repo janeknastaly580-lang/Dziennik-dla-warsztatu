@@ -197,7 +197,7 @@ Kopia obok oryginału nie jest kopią zapasową. Ustaw cotygodniowe przypomnieni
 **Przetestuj odtwarzanie, zanim będzie potrzebne:**
 
 1. Załóż drugi, pusty projekt Supabase.
-2. Wykonaj na nim migracje z `supabase/migracje/` po kolei (0001…0012).
+2. Wykonaj na nim migracje z `supabase/migracje/` po kolei (0001…0014).
 3. Podmień `SUPABASE_URL` w `narzedzia/.env` na projekt testowy.
 4. `npm run przywroc -- kopie/plik.json --na-sucho`, potem bez `--na-sucho`.
 5. Sprawdź liczniki, wróć do `.env` produkcyjnego.

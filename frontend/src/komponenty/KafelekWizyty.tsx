@@ -20,6 +20,7 @@ import {
   ETYKIETA_PRIORYTETU, Kolory, Odstepy, Zaokraglenia, cien, czyOtwarta, opisStatusu,
 } from '../motyw';
 import { formatujDate, formatujKwote, formatujPrzebieg, opisAuta } from '../format';
+import { godzinyWizyty } from '../termin';
 import { CEL_DOTYKU, s, wys } from '../uklad';
 import type { Wizyta } from '../typy';
 
@@ -46,6 +47,7 @@ function KafelekDuzy({ wizyta, onPress, ukryjAuto, klient }: Props) {
   const opis = opisStatusu(wizyta.status);
   const pilne = wizyta.priorytet === 'wysoki';
   const przebieg = formatujPrzebieg(wizyta.przebieg);
+  const godziny = godzinyWizyty(wizyta);
 
   const stopka = [
     klient || null,
@@ -78,7 +80,10 @@ function KafelekDuzy({ wizyta, onPress, ukryjAuto, klient }: Props) {
           </View>
         ) : null}
         <View style={duzy.wypelniacz} />
-        <Text style={duzy.data}>{formatujDate(wizyta.data_wizyty)}</Text>
+        <View style={duzy.termin}>
+          <Text style={duzy.data}>{formatujDate(wizyta.data_wizyty)}</Text>
+          {godziny ? <Text style={duzy.godziny}>{godziny}</Text> : null}
+        </View>
       </View>
 
       <Text style={duzy.tytul} numberOfLines={2}>
@@ -139,7 +144,9 @@ const duzy = StyleSheet.create({
   },
   odznakaPriorytetTekst: { fontSize: s(10), fontWeight: '800', letterSpacing: 0.5 },
   wypelniacz: { flex: 1 },
+  termin: { alignItems: 'flex-end' },
   data: { fontSize: s(13), fontWeight: '600', color: Kolory.tekstDrugi },
+  godziny: { fontSize: s(11.5), fontWeight: '700', color: Kolory.tekstDrugi },
   tytul: {
     fontSize: s(20),
     lineHeight: s(26),
@@ -176,6 +183,7 @@ function KafelekMaly({ wizyta, onPress, ukryjAuto, klient }: Props) {
     klient || null,
     ukryjAuto ? null : opisAuta(wizyta.auto),
     formatujDate(wizyta.data_wizyty),
+    godzinyWizyty(wizyta),
     formatujKwote(wizyta.koszt),
   ].filter(Boolean).join('  ·  ');
 

@@ -147,6 +147,15 @@ const MIGRACJE: string[] = [
   ALTER TABLE wizyty ADD COLUMN naprawione_o TEXT;
   CREATE INDEX IF NOT EXISTS idx_wizyty_naprawione ON wizyty (naprawione_o);
   `,
+
+  // wersja 3 - godziny wizyty wybierane na siatce kalendarza ('HH:MM').
+  // B10: znowu wylacznie dodanie kolumn. Wizyty zalozone starsza wersja
+  // aplikacji maja tu NULL i po prostu nie pokazuja sie na siatce.
+  `
+  ALTER TABLE wizyty ADD COLUMN godzina_od TEXT;
+  ALTER TABLE wizyty ADD COLUMN godzina_do TEXT;
+  CREATE INDEX IF NOT EXISTS idx_wizyty_termin ON wizyty (data_wizyty, godzina_od);
+  `,
 ];
 
 /**

@@ -72,6 +72,10 @@ export type Wizyta = {
   status: Status;
   priorytet: Priorytet;
   data_wizyty: string;
+  /** Godzina rozpoczecia w kalendarzu ('HH:MM'); null = termin nieustawiony. */
+  godzina_od: string | null;
+  /** Godzina zakonczenia w kalendarzu ('HH:MM'). */
+  godzina_do: string | null;
   data_zamkniecia: string | null;
   /** Moment oznaczenia jako naprawione - od niego liczy sie karencja usuwania. */
   naprawione_o: string | null;

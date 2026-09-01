@@ -39,7 +39,8 @@ const DOMYSLNY_LIMIT_POBRANIA = 500;
 const DOZWOLONE: Record<string, string[]> = {
   klienci: ["nazwa", "telefon", "email", "adres", "nip", "notatki"],
   wizyty: ["klient_id", "auto", "tytul", "opis", "status", "priorytet",
-           "data_wizyty", "data_zamkniecia", "przebieg", "koszt", "numer_roboczy"],
+           "data_wizyty", "godzina_od", "godzina_do", "data_zamkniecia",
+           "przebieg", "koszt", "numer_roboczy"],
   dziennik_dostepu: ["akcja", "klient_id", "wizyta_id"],
 };
 const OPERACJE = ["wstaw", "zmien", "usun", "scal"];

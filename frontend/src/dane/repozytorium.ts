@@ -11,6 +11,7 @@ import * as Crypto from 'expo-crypto';
 import { baza, pobierzMeta, ustawMeta } from './baza';
 import { dodajDoKolejki } from './kolejka';
 import { KARENCJA_USUWANIA_DNI } from './konfiguracja';
+import { type Termin, domyslnyTermin } from '../termin';
 import type {
   Auto, Klient, KlientNaLiscie, Priorytet, Status, Wizyta,
 } from '../typy';
@@ -117,6 +118,25 @@ export async function otwarteUsterki(): Promise<Wizyta[]> {
     WHERE w.usuniete_o IS NULL AND w.status <> 'naprawione'
     ORDER BY w.data_wizyty DESC
   `);
+}
+
+/**
+ * Wizyty zaplanowane na dany dzien - to, co siatka kalendarza rysuje jako
+ * zajete godziny. `pomin` wypada z wyniku: wizyta, ktorej termin wlasnie
+ * ustawiamy, nie ma sie blokowac sama.
+ */
+export async function wizytyDnia(data: string, pomin?: string | null): Promise<Wizyta[]> {
+  const db = await baza();
+  return db.getAllAsync<Wizyta>(`
+    SELECT w.*, k.nazwa AS klient_nazwa
+    FROM wizyty w LEFT JOIN klienci k ON k.id = w.klient_id
+    WHERE w.usuniete_o IS NULL
+      AND w.data_wizyty = ?
+      AND w.godzina_od IS NOT NULL
+      AND w.godzina_do IS NOT NULL
+      AND w.id <> ?
+    ORDER BY w.godzina_od
+  `, data, pomin ?? '');
 }
 
 export async function pobierzWizyte(id: string): Promise<Wizyta | null> {
@@ -273,6 +293,8 @@ export type DaneWizyty = {
   tytul: string;
   opis?: string | null;
   priorytet?: Priorytet;
+  /** Dzien i godziny wybrane na siatce kalendarza. */
+  termin?: Termin;
 };
 
 /**
@@ -292,8 +314,9 @@ export async function utworzWizyte(dane: DaneWizyty): Promise<string> {
   const db = await baza();
   const id = nowyId();
   const czas = teraz();
-  const data = czas.slice(0, 10);
   const numer = await nowyNumerRoboczy();
+  // Termin przychodzi z siatki kalendarza; bez niego wizyta ladzie na dzis.
+  const termin = dane.termin ?? domyslnyTermin();
 
   const pola = {
     klient_id: dane.klient_id,
@@ -303,15 +326,19 @@ export async function utworzWizyte(dane: DaneWizyty): Promise<string> {
     // Status ustala system - nowe zgloszenie zawsze startuje jako nienaprawione.
     status: 'nienaprawione' as Status,
     priorytet: (dane.priorytet ?? 'normalny') as Priorytet,
-    data_wizyty: data,
+    data_wizyty: termin.data,
+    godzina_od: termin.godzinaOd,
+    godzina_do: termin.godzinaDo,
     numer_roboczy: numer,
   };
 
   await db.runAsync(
     'INSERT INTO wizyty (id, klient_id, auto, tytul, opis, status, priorytet, data_wizyty,' +
-    ' numer_roboczy, zrobione_o, oczekuje) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+    ' godzina_od, godzina_do, numer_roboczy, zrobione_o, oczekuje)' +
+    ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
     id, pola.klient_id, pola.auto as any, pola.tytul, pola.opis as any,
-    pola.status, pola.priorytet, pola.data_wizyty, pola.numer_roboczy, czas,
+    pola.status, pola.priorytet, pola.data_wizyty, pola.godzina_od, pola.godzina_do,
+    pola.numer_roboczy, czas,
   );
   await dodajDoKolejki('wizyty', id, 'wstaw', pola, czas);
   return id;
@@ -322,7 +349,8 @@ export async function zaktualizujWizyte(
   dane: Partial<{
     auto: string | null; tytul: string; opis: string | null;
     status: Status; priorytet: Priorytet;
-    data_wizyty: string; przebieg: number | null; koszt: number | null;
+    data_wizyty: string; godzina_od: string | null; godzina_do: string | null;
+    przebieg: number | null; koszt: number | null;
   }>,
 ): Promise<void> {
   const db = await baza();
@@ -333,7 +361,7 @@ export async function zaktualizujWizyte(
 
   const kandydaci: Record<string, unknown> = {};
   for (const pole of ['auto', 'tytul', 'opis', 'status', 'priorytet',
-    'data_wizyty', 'przebieg', 'koszt'] as const) {
+    'data_wizyty', 'godzina_od', 'godzina_do', 'przebieg', 'koszt'] as const) {
     if (pole in dane) kandydaci[pole] = PUSTE_NA_NULL((dane as any)[pole]);
   }
 

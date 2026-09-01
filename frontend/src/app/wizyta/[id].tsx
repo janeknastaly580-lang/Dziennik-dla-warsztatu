@@ -34,6 +34,9 @@ import {
 import {
   ETYKIETA_PRIORYTETU, Kolory, Odstepy, Zaokraglenia, cien, opisStatusu,
 } from '../../motyw';
+import {
+  dlugosc, formatujCzasTrwania, formatujGodziny, terminWizyty,
+} from '../../termin';
 import { CEL_DOTYKU, s, wys } from '../../uklad';
 import type { Status, Wizyta } from '../../typy';
 
@@ -120,6 +123,8 @@ export default function EkranWizyty() {
   // Karencja usuwania - liczona lokalnie, zeby ekran dzialal bez zasiegu.
   // Ostateczne zdanie ma baza (`mozna_usunac_wizyte`).
   const ocena = ocenUsuwanieWizyty(wizyta);
+  // Godziny maja tylko wizyty ustawione na kalendarzu (starsze ich nie maja).
+  const termin = terminWizyty(wizyta);
 
   return (
     <View style={style.ekran}>
@@ -189,6 +194,12 @@ export default function EkranWizyty() {
           <Wiersz etykieta="Klient" wartosc={wizyta.klient_nazwa ?? '-'} />
           <Wiersz etykieta="Auto" wartosc={opisAuta(wizyta.auto)} />
           <Wiersz etykieta="Data przyjecia" wartosc={formatujDate(wizyta.data_wizyty)} />
+          {termin ? (
+            <Wiersz
+              etykieta="Godziny"
+              wartosc={`${formatujGodziny(termin)}  ·  ${formatujCzasTrwania(dlugosc(termin))}`}
+            />
+          ) : null}
           {wizyta.data_zamkniecia ? (
             <Wiersz etykieta="Data zamkniecia" wartosc={formatujDate(wizyta.data_zamkniecia)} />
           ) : null}
