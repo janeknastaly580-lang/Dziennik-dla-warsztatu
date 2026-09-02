@@ -271,6 +271,33 @@ i **odśwież** tę (samo „spróbuj ponownie" bez przeładowania nie pomoże:
 wątek roboczy SQLite zapamiętuje nieudaną inicjalizację na stałe).
 W gotowym programie problem nie istnieje — bazę otwiera proces główny.
 
+## Deploy w przeglądarce (Vercel)
+
+Na wierzchu repozytorium leży `vercel.json`. Bez niego Vercel nie ma czego
+zbudować — w katalogu głównym nie ma ani `package.json`, ani `index.html`,
+więc deploy kończył się stroną **404: NOT_FOUND**. Plik mówi wprost, co
+uruchomić i co wystawić:
+
+```
+installCommand     cd frontend && npm ci
+buildCommand       cd frontend && npm run eksport-web
+outputDirectory    frontend/dist
+```
+
+Do tego jedna reguła przepisania wszystkich ścieżek na `/index.html`. Ekrany
+chodzą jako SPA (`web.output: "single"` w `app.json`), więc pod adresem
+`/kalendarz` nie ma żadnego pliku — bez tej reguły odświeżenie strony w środku
+aplikacji dawałoby 404, tym razem naprawdę.
+
+W panelu Vercela **Root Directory musi zostać katalogiem głównym repozytorium**
+(`./`). Ustawienie go na `frontend/` sprawia, że ten plik przestaje być
+widziany i 404 wraca.
+
+> **To dalej jest tylko podgląd.** Wystawiona strona nie ma DPAPI ani
+> SQLCipher — token, hasło i cała lokalna baza leżą w `localStorage` i OPFS
+> przeglądarki, na każdym komputerze, na którym ktoś otworzy ten adres.
+> Do pracy na prawdziwych danych klientów służy program Windows.
+
 ## Klucze — co gdzie mieszka
 
 | Plik / miejsce | Co trzyma | W repozytorium? |
@@ -552,6 +579,8 @@ narzedzia/                  skrypty dostawcy — NIE serwer, nic nie działa w t
     ├── przywroc-kopie.js     odtworzenie (przetestuj je!)
     ├── skanuj-sekrety.js     skaner + hook pre-commit
     └── migruj-do-supabase.js jednorazowy import starej bazy
+
+vercel.json                 deploy podglądu: co zbudować i który katalog wystawić
 ```
 
 ---

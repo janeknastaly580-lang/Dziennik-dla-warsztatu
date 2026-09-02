@@ -1,11 +1,11 @@
 /**
  * Pasek z dniem (albo zakresem dni), ktory kalendarz pokazuje.
  *
- * Strzalki przesuwaja widok o `krok` dni - w kalendarzu warsztatu o cale
- * cztery, czyli o tyle, ile widac naraz; przy wyborze terminu o jeden.
- * Dotkniecie nazwy rozwija siatke miesiaca - stad skok na dowolna date,
- * takze o kilka miesiecy dalej, bez przewijania dzien po dniu. Kropka pod
- * numerem znaczy, ze na ten dzien jest juz zaplanowana jakas wizyta.
+ * Strzalki przesuwaja widok o `krok` dni - o cale cztery, czyli o tyle, ile
+ * widac naraz. Dotkniecie nazwy rozwija siatke miesiaca - stad skok na
+ * dowolna date, takze o kilka miesiecy dalej, bez przewijania dzien po dniu.
+ * Kropka pod numerem znaczy, ze na ten dzien jest juz zaplanowana jakas
+ * wizyta.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -20,7 +20,7 @@ import {
 import { CEL_DOTYKU, s } from '../uklad';
 
 export default function PasekDnia({
-  data, onZmiana, doData, krok = 1,
+  data, onZmiana, doData, krok = 1, wybrany,
 }: {
   /** Pierwszy dzien widoku - to on zmienia sie strzalkami. */
   data: string;
@@ -29,6 +29,12 @@ export default function PasekDnia({
   doData?: string;
   /** O ile dni przesuwaja strzalki. */
   krok?: number;
+  /**
+   * Dzien zaznaczony w siatce miesiaca; domyslnie pierwszy dzien widoku.
+   * Przy wyborze terminu to dzien WIZYTY - moze stac w dowolnej z czterech
+   * kolumn, a siatka ma pokazywac wlasnie jego, a nie poczatek widoku.
+   */
+  wybrany?: string;
 }) {
   const [rozwiniety, setRozwiniety] = useState(false);
   const [miesiac, setMiesiac] = useState(data);
@@ -36,6 +42,7 @@ export default function PasekDnia({
 
   const dni = useMemo(() => siatkaMiesiaca(miesiac), [miesiac]);
   const dzis = dzisiaj();
+  const zaznaczony = wybrany ?? data;
   const zakres = doData && doData !== data;
   const tytul = zakres ? etykietaZakresu(data, doData) : etykietaDnia(data);
   // Przy kilku dniach naraz "Dzis" stoi juz nad wlasciwa kolumna siatki -
@@ -131,7 +138,7 @@ export default function PasekDnia({
 
           <View style={style.kratki}>
             {dni.map((dzien) => {
-              const wybrany = dzien === data;
+              const zaznaczona = dzien === zaznaczony;
               const wTymMiesiacu = tenSamMiesiac(dzien, miesiac);
               return (
                 <Pressable
@@ -142,15 +149,15 @@ export default function PasekDnia({
                   style={({ pressed }) => [
                     style.kratka,
                     dzien === dzis && style.kratkaDzis,
-                    wybrany && style.kratkaWybrana,
-                    pressed && !wybrany && style.kratkaWcisnieta,
+                    zaznaczona && style.kratkaWybrana,
+                    pressed && !zaznaczona && style.kratkaWcisnieta,
                   ]}
                 >
                   <Text
                     style={[
                       style.kratkaTekst,
                       !wTymMiesiacu && style.kratkaTekstObcy,
-                      wybrany && style.kratkaTekstWybrany,
+                      zaznaczona && style.kratkaTekstWybrany,
                     ]}
                   >
                     {dzienMiesiaca(dzien)}
@@ -159,7 +166,7 @@ export default function PasekDnia({
                     style={[
                       style.kropka,
                       zWizytami.includes(dzien) && (
-                        wybrany ? style.kropkaNaWybranym : style.kropkaWidoczna
+                        zaznaczona ? style.kropkaNaWybranym : style.kropkaWidoczna
                       ),
                     ]}
                   />

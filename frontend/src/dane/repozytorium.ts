@@ -122,29 +122,15 @@ export async function otwarteUsterki(): Promise<Wizyta[]> {
 }
 
 /**
- * Wizyty zaplanowane na dany dzien - to, co siatka kalendarza rysuje jako
- * zajete godziny. `pomin` wypada z wyniku: wizyta, ktorej termin wlasnie
- * ustawiamy, nie ma sie blokowac sama.
+ * Wizyty z kilku kolejnych dni - to, co rysuje kalendarz warsztatu i wybor
+ * terminu. Zakres jest domkniety z obu stron ('2026-09-01' .. '2026-09-04').
+ *
+ * `pomin` wypada z wyniku: wizyta, ktorej termin wlasnie ustawiamy, nie ma
+ * sie blokowac sama.
  */
-export async function wizytyDnia(data: string, pomin?: string | null): Promise<Wizyta[]> {
-  const db = await baza();
-  return db.getAllAsync<Wizyta>(`
-    SELECT w.*, k.nazwa AS klient_nazwa
-    FROM wizyty w LEFT JOIN klienci k ON k.id = w.klient_id
-    WHERE w.usuniete_o IS NULL
-      AND w.data_wizyty = ?
-      AND w.godzina_od IS NOT NULL
-      AND w.godzina_do IS NOT NULL
-      AND w.id <> ?
-    ORDER BY w.godzina_od
-  `, data, pomin ?? '');
-}
-
-/**
- * Wizyty z kilku kolejnych dni - to, co rysuje kalendarz warsztatu.
- * Zakres jest domkniety z obu stron ('2026-09-01' .. '2026-09-04').
- */
-export async function wizytyZakresu(od: string, do_: string): Promise<Wizyta[]> {
+export async function wizytyZakresu(
+  od: string, do_: string, pomin?: string | null,
+): Promise<Wizyta[]> {
   const db = await baza();
   return db.getAllAsync<Wizyta>(`
     SELECT w.*, k.nazwa AS klient_nazwa
@@ -153,8 +139,9 @@ export async function wizytyZakresu(od: string, do_: string): Promise<Wizyta[]> 
       AND w.data_wizyty BETWEEN ? AND ?
       AND w.godzina_od IS NOT NULL
       AND w.godzina_do IS NOT NULL
+      AND w.id <> ?
     ORDER BY w.data_wizyty, w.godzina_od
-  `, od, do_);
+  `, od, do_, pomin ?? '');
 }
 
 /**

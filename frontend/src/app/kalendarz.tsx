@@ -19,14 +19,12 @@ import { StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import PasekDnia from '../komponenty/PasekDnia';
-import SiatkaDni from '../komponenty/SiatkaDni';
+import SiatkaDni, { DNI_W_WIDOKU } from '../komponenty/SiatkaDni';
 import { wizytyZakresu } from '../dane/repozytorium';
 import { Kolory } from '../motyw';
 import { dzisiaj, kolejneDni, naMinuty } from '../termin';
 import type { Wizyta } from '../typy';
 
-/** Ile dni stoi obok siebie - i o tyle samo przesuwaja strzalki. */
-const DNI_W_WIDOKU = 4;
 /** Gdy w widoku nie ma zadnej wizyty, widok staje na poczatku dnia pracy. */
 const DOMYSLNA_GODZINA = 8 * 60;
 

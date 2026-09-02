@@ -1,7 +1,8 @@
 /**
  * Siatka doby - jedna dla obu miejsc, w ktorych aplikacja rysuje godziny:
- * kalendarza warsztatu (cztery dni obok siebie) i wyboru terminu wizyty
- * (jeden dzien, z przeciaganym blokiem).
+ * kalendarza warsztatu i wyboru terminu wizyty. Oba pokazuja te same cztery
+ * dni obok siebie (`DNI_W_WIDOKU`), wiec mechanik wybiera termin na tym
+ * samym widoku, na ktorym oglada grafik.
  *
  * Godziny stoja w stalej kolumnie po lewej, kazdy dzien dostaje wlasna
  * kolumne, a wizyty ida na wysokosci swojego czasu trwania. Te, ktore w
@@ -10,11 +11,11 @@
  *
  * Roznice miedzy oboma widokami sprowadzaja sie do kilku propsow:
  *
- *   kalendarz       `dni` z czterema dniami i `onWizyta` (bloki klikalne).
- *                   Dochodzi naglowek z nazwami dni i czerwona linia "teraz".
- *   wybor terminu   `dni` z jednym dniem, `rezerwacjaOd/Do` (wybierany blok
- *                   wchodzi do ukladu kolumn, wiec nie zaslania zajetych
- *                   godzin), `tlo` z gestem i `children` na wierzchu siatki.
+ *   kalendarz       `onWizyta` - bloki wizyt sa klikalne.
+ *   wybor terminu   `rezerwacjaData` i `rezerwacjaOd/Do` (wybierany blok
+ *                   wchodzi do ukladu kolumn SWOJEGO dnia, wiec nie zaslania
+ *                   zajetych godzin), `tlo` z gestem dla kazdej kolumny
+ *                   i `children` na wierzchu siatki.
  *
  * Naglowek z dniami stoi NAD przewijana siatka, wiec nazwy dni zostaja na
  * ekranie, kiedy mechanik przewija dobe w gore i w dol.
@@ -32,6 +33,8 @@ import {
 import { s } from '../uklad';
 import type { Wizyta } from '../typy';
 
+/** Ile dni stoi obok siebie - w kalendarzu i przy wyborze terminu. */
+export const DNI_W_WIDOKU = 4;
 /** Wysokosc jednej godziny - z niej wynikaja wszystkie pozycje na siatce. */
 export const WYS_GODZINY = s(56);
 export const PIKSELE_NA_MINUTE = WYS_GODZINY / 60;
@@ -116,8 +119,13 @@ type Props = {
   wyrozniona?: string | null;
   /** Gdy podane, bloki wizyt sa klikalne. */
   onWizyta?: (wizyta: Wizyta) => void;
-  /** Uchwyty gestu dla pustego tla siatki. */
-  tlo?: GestureResponderHandlers;
+  /**
+   * Uchwyty gestu dla pustego tla - osobno dla kazdej kolumny, wiec
+   * dotkniecie niesie ze soba dzien, a nie tylko godzine.
+   */
+  tlo?: (dzien: string) => GestureResponderHandlers;
+  /** Dzien, w ktorego kolumnie stoi wybierany termin; domyslnie pierwszy. */
+  rezerwacjaData?: string | null;
   /** Godziny wybieranego terminu - dziela szerokosc z wizytami tego dnia. */
   rezerwacjaOd?: number | null;
   rezerwacjaDo?: number | null;
@@ -129,7 +137,7 @@ type Props = {
 
 export default function SiatkaDni({
   dni, wizyty, przewinDo, wyrozniona, onWizyta, tlo,
-  rezerwacjaOd, rezerwacjaDo, ukryjGodzine, children,
+  rezerwacjaData, rezerwacjaOd, rezerwacjaDo, ukryjGodzine, children,
 }: Props) {
   const przewijanie = useRef<ScrollView>(null);
   const [szerokosc, setSzerokosc] = useState(0);
@@ -157,20 +165,24 @@ export default function SiatkaDni({
     return () => clearInterval(zegar);
   }, [wieleDni]);
 
+  /** Dzien, w ktorego kolumnie stoi wybierany termin. */
+  const dzienRezerwacji = rezerwacjaData ?? dni[0];
+
   /** Wizyty rozdzielone na dni, w kazdym dniu ulozone w kolumny. */
   const ulozone = useMemo(() => dni.map((dzien) => {
     const pozycje = wizyty
       .filter((w) => String(w.data_wizyty ?? '').slice(0, 10) === dzien)
       .map(pozycjaWizyty);
 
-    // Wybierany termin wchodzi do ukladu na rowni z wizytami, wiec nie
-    // zaslania tego, co juz stoi o tej porze.
-    if (rezerwacjaOd !== null && rezerwacjaOd !== undefined
+    // Wybierany termin wchodzi do ukladu na rowni z wizytami TEGO dnia,
+    // wiec nie zaslania tego, co juz stoi o tej porze.
+    if (dzien === dzienRezerwacji
+      && rezerwacjaOd !== null && rezerwacjaOd !== undefined
       && rezerwacjaDo !== null && rezerwacjaDo !== undefined) {
       pozycje.push({ id: REZERWACJA, od: rezerwacjaOd, koniec: rezerwacjaDo });
     }
     return ulozPozycje(pozycje);
-  }), [dni, wizyty, rezerwacjaOd, rezerwacjaDo]);
+  }), [dni, wizyty, dzienRezerwacji, rezerwacjaOd, rezerwacjaDo]);
 
   const szerokoscDnia = dni.length
     ? Math.max(0, szerokosc - SZEROKOSC_GODZIN) / dni.length
@@ -182,10 +194,11 @@ export default function SiatkaDni({
     width: dostepna / kolumn - (kolumn > 1 ? LUZ_BLOKU : 0),
   });
 
-  const rezerwacja = ulozone[0]?.find((p) => p.id === REZERWACJA);
-  const polozenieRezerwacji = rezerwacja
-    ? polozenie(0, rezerwacja.kolumna, rezerwacja.kolumn)
-    : { left: SZEROKOSC_GODZIN, width: dostepna };
+  const indeksRezerwacji = Math.max(0, dni.indexOf(dzienRezerwacji));
+  const rezerwacja = ulozone[indeksRezerwacji]?.find((p) => p.id === REZERWACJA);
+  const polozenieRezerwacji = polozenie(
+    indeksRezerwacji, rezerwacja?.kolumna ?? 0, rezerwacja?.kolumn ?? 1,
+  );
 
   const dzis = dzisiaj();
 
@@ -222,7 +235,16 @@ export default function SiatkaDni({
         showsVerticalScrollIndicator={false}
       >
         <View style={style.siatka} onLayout={zmierz}>
-          {tlo ? <View style={style.tlo} {...tlo} /> : null}
+          {tlo ? dni.map((dzien, i) => (
+            <View
+              key={dzien}
+              style={[style.tlo, {
+                left: SZEROKOSC_GODZIN + i * szerokoscDnia,
+                width: szerokoscDnia,
+              }]}
+              {...tlo(dzien)}
+            />
+          )) : null}
 
           {/* Linie godzin i podzial na dni */}
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -309,7 +331,12 @@ export default function SiatkaDni({
               pointerEvents="none"
               style={[style.teraz, { top: teraz * PIKSELE_NA_MINUTE }]}
             >
-              <Text style={style.terazGodzina}>{naGodzine(teraz)}</Text>
+              {/* Godzina znika, gdy stoi na niej godzina krawedzi wybieranego
+                  bloku - dwie liczby jedna na drugiej sa nie do odczytania.
+                  Kreska zostaje, bo to ona niesie informacje. */}
+              <Text style={style.terazGodzina}>
+                {ukryjGodzine?.(teraz * PIKSELE_NA_MINUTE) ? '' : naGodzine(teraz)}
+              </Text>
               <View style={style.terazKreska} />
             </View>
           ) : null}
@@ -358,8 +385,6 @@ const style = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: SZEROKOSC_GODZIN,
-    right: 0,
   },
   linia: {
     position: 'absolute',

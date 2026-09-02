@@ -2,16 +2,18 @@
  * Termin wizyty wybierany PALCEM na siatce kalendarza.
  *
  * W formularzu stoi jeden wiersz z dniem i godzinami. Dotkniecie otwiera
- * dzien na cala wysokosc ekranu: niebieski prostokat to wizyta, dwa kolka
- * na jego rogach to poczatek i koniec. Przeciagniecie kolka zmienia czas
- * trwania, przeciagniecie srodka przesuwa cala wizyte, dotkniecie pustego
- * miejsca przenosi ja tam bez zmiany dlugosci. Wszystko przyciaga sie do
- * kwadransa, wiec palec nie musi byc precyzyjny.
+ * na cala wysokosc ekranu TEN SAM widok, co kalendarz warsztatu - cztery dni
+ * obok siebie. Niebieski prostokat to wizyta, dwa kolka na jego rogach to
+ * poczatek i koniec. Przeciagniecie kolka zmienia czas trwania,
+ * przeciagniecie srodka przesuwa cala wizyte, a dotkniecie pustego miejsca -
+ * takze w kolumnie INNEGO dnia - przenosi ja tam bez zmiany dlugosci.
+ * Wszystko przyciaga sie do kwadransa, wiec palec nie musi byc precyzyjny.
  *
- * Dzien zmienia sie strzalkami, a dotkniecie jego nazwy rozwija siatke
- * miesiaca - patrz `PasekDnia`. Bloki w tle to wizyty juz zaplanowane na ten
- * dzien: mechanik widzi zajete godziny w chwili wybierania, a nie po zapisie.
- * Wszystko idzie z lokalnej bazy, wiec dziala tak samo bez zasiegu (D1).
+ * Strzalki przesuwaja widok o cale cztery dni, a dotkniecie zakresu rozwija
+ * siatke miesiaca - patrz `PasekDnia`. Bloki w tle to wizyty juz zaplanowane
+ * na te dni: mechanik widzi zajete godziny w chwili wybierania, a nie po
+ * zapisie. Wszystko idzie z lokalnej bazy, wiec dziala tak samo bez
+ * zasiegu (D1).
  *
  * Swiadomie NIE ma tu ani jednej linijki instrukcji: ksztalt, kolka i
  * przyciaganie tlumacza sie same, a kazde zdanie na tym ekranie zabieraloby
@@ -26,16 +28,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard, PanResponder, Pressable, StyleSheet, Text, View,
+  type GestureResponderHandlers,
 } from 'react-native';
 
 import { Przycisk } from './Formularz';
 import PasekDnia from './PasekDnia';
-import SiatkaDni, { PIKSELE_NA_MINUTE } from './SiatkaDni';
-import { wizytyDnia } from '../dane/repozytorium';
+import SiatkaDni, { DNI_W_WIDOKU, PIKSELE_NA_MINUTE } from './SiatkaDni';
+import { wizytyZakresu } from '../dane/repozytorium';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
 import {
   DZIEN, MIN_DLUGOSC, type Termin, dlugosc, doKroku, etykietaDnia,
-  formatujCzasTrwania, formatujGodziny, naGodzine, naMinuty, wzgledemDzis,
+  formatujCzasTrwania, formatujGodziny, kolejneDni, naGodzine, naMinuty,
+  wzgledemDzis,
 } from '../termin';
 import { CEL_DOTYKU, s } from '../uklad';
 import type { Wizyta } from '../typy';
@@ -108,7 +112,11 @@ export function KalendarzTerminu({
   onGotowe: (termin: Termin) => void;
   onAnuluj: () => void;
 }) {
+  /** Dzien wizyty - to w jego kolumnie stoi wybierany blok. */
   const [data, setData] = useState(wartosc.data);
+  /* Pierwszy dzien widoku. Startuje na dniu wizyty, wiec jest ona w pierwszej
+     kolumnie, a trzy nastepne dni widac obok niej od razu. */
+  const [pierwszyDzien, setPierwszyDzien] = useState(wartosc.data);
   const [od, setOd] = useState(() => naMinuty(wartosc.godzinaOd));
   const [koniec, setKoniec] = useState(() =>
     Math.max(naMinuty(wartosc.godzinaDo), naMinuty(wartosc.godzinaOd) + MIN_DLUGOSC));
@@ -125,14 +133,28 @@ export function KalendarzTerminu({
   /** Zakres z chwili polozenia palca; do niego dodajemy przesuniecie. */
   const poczatek = useRef({ od, koniec });
 
-  /* Zajete godziny tego dnia - z lokalnej bazy, wiec i bez zasiegu. */
+  const dni = useMemo(() => kolejneDni(pierwszyDzien, DNI_W_WIDOKU), [pierwszyDzien]);
+  const ostatni = dni[dni.length - 1];
+
+  /* Zajete godziny tych dni - z lokalnej bazy, wiec i bez zasiegu. */
   useEffect(() => {
     let aktywny = true;
-    wizytyDnia(data, pomijanaWizyta)
+    wizytyZakresu(pierwszyDzien, ostatni, pomijanaWizyta)
       .then((lista) => { if (aktywny) setZajete(lista); })
       .catch(() => { if (aktywny) setZajete([]); });
     return () => { aktywny = false; };
-  }, [data, pomijanaWizyta]);
+  }, [pierwszyDzien, ostatni, pomijanaWizyta]);
+
+  /**
+   * Zmiana z paska: strzalki przesuwaja widok o cale cztery dni, a siatka
+   * miesiaca skacze na wskazany dzien. W obu razach wybrany dzien staje sie
+   * pierwsza kolumna i dniem wizyty - termin zostaje na oczach mechanika,
+   * zamiast wypasc poza widok.
+   */
+  const zmienDzien = useCallback((dzien: string) => {
+    setPierwszyDzien(dzien);
+    setData(dzien);
+  }, []);
 
   /* Escape zamyka kalendarz, a nie caly formularz. */
   useEffect(() => {
@@ -178,28 +200,37 @@ export function KalendarzTerminu({
   }, []);
 
   /**
-   * Dotkniecie pustego miejsca przenosi wizyte, zachowujac jej dlugosc.
-   * Przeciagniecie palcem po tle to przewijanie dnia - dlatego reagujemy
-   * dopiero na puszczenie i tylko wtedy, gdy palec praktycznie nie drgnal.
+   * Dotkniecie pustego miejsca przenosi wizyte, zachowujac jej dlugosc -
+   * takze do kolumny innego dnia, bo kazda kolumna ma wlasny gest i wie,
+   * ktory dzien pokazuje. Przeciagniecie palcem po tle to przewijanie doby,
+   * dlatego reagujemy dopiero na puszczenie i tylko wtedy, gdy palec
+   * praktycznie nie drgnal.
    */
-  const tlo = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    // `locationY` jest liczone wzgledem tla, a wiec wzgledem calej doby -
-    // przewijanie dnia nie ma na nie wplywu. Zapamietujemy je od razu, bo
-    // przy puszczeniu palca zdarzenie nie niesie juz polozenia.
-    onPanResponderGrant: (zdarzenie) => {
-      dotkniecie.current = zdarzenie.nativeEvent.locationY;
-    },
-    onPanResponderRelease: (_zdarzenie, gest) => {
-      if (Math.abs(gest.dx) > s(6) || Math.abs(gest.dy) > s(6)) return;
-      const minuty = dotkniecie.current / PIKSELE_NA_MINUTE;
-      if (!Number.isFinite(minuty)) return;
-      const dlugoscBloku = teraz.current.koniec - teraz.current.od;
-      const nowyOd = ogranicz(doKroku(minuty), 0, DZIEN - dlugoscBloku);
-      setOd(nowyOd);
-      setKoniec(nowyOd + dlugoscBloku);
-    },
-  }), []);
+  const tlo = useMemo(() => {
+    const uchwyty: Record<string, GestureResponderHandlers> = {};
+    for (const dzien of dni) {
+      uchwyty[dzien] = PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        // `locationY` jest liczone wzgledem tla kolumny, a wiec wzgledem
+        // calej doby - przewijanie nie ma na nie wplywu. Zapamietujemy je od
+        // razu, bo przy puszczeniu palca zdarzenie nie niesie juz polozenia.
+        onPanResponderGrant: (zdarzenie) => {
+          dotkniecie.current = zdarzenie.nativeEvent.locationY;
+        },
+        onPanResponderRelease: (_zdarzenie, gest) => {
+          if (Math.abs(gest.dx) > s(6) || Math.abs(gest.dy) > s(6)) return;
+          const minuty = dotkniecie.current / PIKSELE_NA_MINUTE;
+          if (!Number.isFinite(minuty)) return;
+          const dlugoscBloku = teraz.current.koniec - teraz.current.od;
+          const nowyOd = ogranicz(doKroku(minuty), 0, DZIEN - dlugoscBloku);
+          setData(dzien);
+          setOd(nowyOd);
+          setKoniec(nowyOd + dlugoscBloku);
+        },
+      }).panHandlers;
+    }
+    return (dzien: string) => uchwyty[dzien];
+  }, [dni]);
 
   const gorna = od * PIKSELE_NA_MINUTE;
   const dolna = koniec * PIKSELE_NA_MINUTE;
@@ -213,13 +244,20 @@ export function KalendarzTerminu({
 
   return (
     <View style={style.warstwa}>
-      <PasekDnia data={data} onZmiana={setData} />
+      <PasekDnia
+        data={pierwszyDzien}
+        doData={ostatni}
+        krok={DNI_W_WIDOKU}
+        wybrany={data}
+        onZmiana={zmienDzien}
+      />
 
       <SiatkaDni
-        dni={[data]}
+        dni={dni}
         wizyty={zajete}
         przewinDo={przewinDo}
-        tlo={tlo.panHandlers}
+        tlo={tlo}
+        rezerwacjaData={data}
         rezerwacjaOd={od}
         rezerwacjaDo={koniec}
         ukryjGodzine={ukryjGodzine}
@@ -267,6 +305,9 @@ export function KalendarzTerminu({
 
       <View style={style.stopka}>
         <View style={style.stopkaOpis}>
+          {/* Dzien wybiera sie teraz kolumna, wiec musi stac takze tutaj -
+              przycisk obok zapisuje date, a nie same godziny. */}
+          <Text style={style.stopkaDzien}>{etykietaDnia(data)}</Text>
           <Text style={style.stopkaGodziny}>{formatujGodziny(termin)}</Text>
           <Text style={style.stopkaCzas}>{formatujCzasTrwania(koniec - od)}</Text>
         </View>
@@ -366,6 +407,7 @@ const style = StyleSheet.create({
     gap: Odstepy.m,
   },
   stopkaOpis: { flexDirection: 'row', alignItems: 'baseline', gap: Odstepy.m },
+  stopkaDzien: { fontSize: s(14), fontWeight: '700', color: Kolory.tekstDrugi },
   stopkaGodziny: { fontSize: s(20), fontWeight: '800', color: Kolory.tekst },
   stopkaCzas: { fontSize: s(14), fontWeight: '700', color: Kolory.tekstDrugi },
   stopkaPrzyciski: { flexDirection: 'row', gap: Odstepy.s },
