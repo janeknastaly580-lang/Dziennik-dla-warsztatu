@@ -17,7 +17,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, FlatList, Linking, Pressable, RefreshControl,
-  StyleSheet, Text, View,
+  StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -32,12 +32,18 @@ import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { useAplikacja } from '../../dane/kontekst';
 import { formatujKwote } from '../../format';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../../motyw';
-import { CEL_DOTYKU, s, wys } from '../../uklad';
+import {
+  CEL_DOTYKU, SZEROKOSC_TRESCI, dopelnijWiersz, kolumnyKafelkow, pewneWymiary, s, wys,
+} from '../../uklad';
 import type { Klient, KlientNaLiscie, Wizyta } from '../../typy';
 
 export default function EkranProfiluKlienta() {
   const router = useRouter();
   const { synchronizuj } = useAplikacja();
+  // Historia idzie w dwoch kolumnach - wiecej rozbijaloby czytanie kafelkow,
+  // ktore i tak niosa po kilka linii tekstu.
+  const { width } = pewneWymiary(useWindowDimensions());
+  const kolumny = kolumnyKafelkow(width, 2);
   const parametry = useLocalSearchParams<{ id: string }>();
   const klientId = String(parametry.id ?? '');
 
@@ -238,15 +244,22 @@ export default function EkranProfiluKlienta() {
       <Stack.Screen options={{ title: klient.nazwa }} />
 
       <FlatList
-        data={wizyty}
-        keyExtractor={(w) => w.id}
+        data={dopelnijWiersz(wizyty, kolumny)}
+        keyExtractor={(w, i) => w?.id ?? `pusty-${i}`}
         ListHeaderComponent={naglowek}
+        key={`kolumny-${kolumny}`}
+        numColumns={kolumny}
+        columnWrapperStyle={kolumny > 1 ? style.wiersz : undefined}
         renderItem={({ item }) => (
-          <KafelekWizyty
-            wizyta={item}
-            ukryjAuto={wybraneAuto !== null}
-            onPress={() => router.push(`/wizyta/${item.id}`)}
-          />
+          <View style={style.komorka}>
+            {item ? (
+              <KafelekWizyty
+                wizyta={item}
+                ukryjAuto={wybraneAuto !== null}
+                onPress={() => router.push(`/wizyta/${item.id}`)}
+              />
+            ) : null}
+          </View>
         )}
         contentContainerStyle={style.lista}
         refreshControl={
@@ -295,7 +308,15 @@ function Statystyka({ wartosc, opis, kolor }: { wartosc: string; opis: string; k
 
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
-  lista: { padding: Odstepy.l, paddingBottom: wys(6, 32) },
+  wiersz: { gap: Odstepy.m, alignItems: 'flex-start' },
+  komorka: { flex: 1, minWidth: 0 },
+  lista: {
+    width: '100%',
+    maxWidth: SZEROKOSC_TRESCI,
+    alignSelf: 'center',
+    padding: Odstepy.l,
+    paddingBottom: wys(6, 32),
+  },
 
   duplikat: {
     backgroundColor: Kolory.wTrakcieTlo,

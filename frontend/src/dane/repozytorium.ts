@@ -11,6 +11,7 @@ import * as Crypto from 'expo-crypto';
 import { baza, pobierzMeta, ustawMeta } from './baza';
 import { dodajDoKolejki } from './kolejka';
 import { KARENCJA_USUWANIA_DNI } from './konfiguracja';
+import { doPorownaniaScisle, samCyfry } from '../format';
 import { type Termin, domyslnyTermin } from '../termin';
 import type {
   Auto, Klient, KlientNaLiscie, Priorytet, Status, Wizyta,
@@ -185,14 +186,6 @@ export async function pobierzWizyte(id: string): Promise<Wizyta | null> {
 /*  B3 - OSTRZEZENIA O DUPLIKATACH (dzialaja bez sieci)                   */
 /* ====================================================================== */
 
-const samCyfry = (t?: string | null) => (t ?? '').replace(/[^0-9]/g, '').slice(-9);
-const doPorownania = (t?: string | null) => (t ?? '')
-  .toLowerCase()
-  .replace(/[ąĄ]/g, 'a').replace(/[ćĆ]/g, 'c').replace(/[ęĘ]/g, 'e')
-  .replace(/[łŁ]/g, 'l').replace(/[ńŃ]/g, 'n').replace(/[óÓ]/g, 'o')
-  .replace(/[śŚ]/g, 's').replace(/[źŹżŻ]/g, 'z')
-  .replace(/[^a-z0-9]/g, '');
-
 /** Czy ktos juz ma taki numer telefonu? Pyta o to formularz nowego klienta. */
 export async function klienciZTymSamymTelefonem(telefon: string): Promise<KlientNaLiscie[]> {
   const numer = samCyfry(telefon);
@@ -206,7 +199,7 @@ export async function klienciZTymSamymTelefonem(telefon: string): Promise<Klient
  * Ostrzezenie przed zalozeniem drugiego zgloszenia tej samej usterki.
  */
 export async function otwartaWizytaTegoAuta(auto: string): Promise<Wizyta | null> {
-  const znormalizowane = doPorownania(auto);
+  const znormalizowane = doPorownaniaScisle(auto);
   if (!znormalizowane) return null;
   const db = await baza();
   const granica = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
@@ -216,7 +209,7 @@ export async function otwartaWizytaTegoAuta(auto: string): Promise<Wizyta | null
     WHERE w.usuniete_o IS NULL AND w.status <> 'naprawione'
       AND COALESCE(w.zrobione_o, w.data_wizyty) > ?
   `, granica);
-  return kandydaci.find((w) => doPorownania(w.auto) === znormalizowane) ?? null;
+  return kandydaci.find((w) => doPorownaniaScisle(w.auto) === znormalizowane) ?? null;
 }
 
 /* ====================================================================== */

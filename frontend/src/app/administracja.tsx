@@ -40,7 +40,7 @@ import {
 import { pobierzToken } from '../dane/sesja';
 import { useAplikacja } from '../dane/kontekst';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
-import { CEL_DOTYKU, s, wys } from '../uklad';
+import { CEL_DOTYKU, SZEROKOSC_CZYTANIA, s, wys } from '../uklad';
 
 type Pytanie =
   | { rodzaj: 'zablokuj_mechanika'; mechanik: MechanikAdmina }
@@ -352,7 +352,13 @@ export default function EkranAdministracji() {
 
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
-  tresc: { padding: Odstepy.l, paddingBottom: wys(8, 32) },
+  tresc: {
+    padding: Odstepy.l,
+    paddingBottom: wys(8, 32),
+    width: '100%',
+    maxWidth: SZEROKOSC_CZYTANIA,
+    alignSelf: 'center',
+  },
 
   opis: { fontSize: s(13), lineHeight: s(19), color: Kolory.tekstDrugi, marginBottom: Odstepy.m },
   drobne: { fontSize: s(12), lineHeight: s(17), color: Kolory.tekstSlaby },

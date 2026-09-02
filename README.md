@@ -318,20 +318,29 @@ Wymagają `narzedzia/.env` z kluczem `service_role` (wzór w `.env.example`).
 
 # 3. Interfejs aplikacji
 
-Ekrany robocze są projektowane pod **wąską kolumnę** w proporcjach około 9:16 —
-wysoką i wąską. Odpowiada za to `frontend/src/uklad.ts` oraz komponent
-`KolumnaEkranu`, który owija całą nawigację: gdy okno jest szersze niż 9/16
-swojej wysokości, kolumna przestaje rosnąć i staje na środku, na spokojnym tle.
+Interfejs jest projektowany pod **okno programu na komputerze** — okno startuje
+w rozmiarze 1280 × 880 i schodzi najwyżej do 720 px szerokości. Ekrany zajmują
+całe okno, ale nie każda treść ma się po nim rozlewać; decydują o tym trzy
+szerokości z `frontend/src/uklad.ts`:
 
-**Wyjątek: kalendarz.** Cztery dni obok siebie to widok tabelaryczny, któremu
-szerokość służy — ten ekran prosi o całe okno hakiem `usePelnaSzerokosc()`
-i oddaje je z powrotem, gdy mechanik wejdzie w zgłoszenie. Dlatego okno
-programu startuje w rozmiarze 1180 × 860: mieści grafik, a ekrany robocze i tak
-zostają wąską kolumną.
+| Stała | Ile | Gdzie |
+|---|---|---|
+| `SZEROKOSC_TRESCI` | 1320 | listy i siatki kafelków (klienci, usterki, historia) |
+| `SZEROKOSC_CZYTANIA` | 940 | ekrany do czytania: zgłoszenie, ustawienia, dostęp |
+| `SZEROKOSC_FORMULARZA` | 760 | formularze — pole na całe okno wygląda jak błąd |
+
+Powyżej tych granic treść staje na środku okna zamiast ciągnąć się przez cały
+monitor. **Kalendarz jest wyjątkiem i bierze całą szerokość** — cztery dni obok
+siebie potrzebują miejsca.
+
+**Kafelki idą w kolumnach.** `kolumnyKafelkow()` liczy, ile zmieści się obok
+siebie przy założeniu, że kafelek poniżej 380 dp robi się nieczytelny: przy
+domyślnym oknie to trzy kolumny kartotek i usterek, dwie w historii klienta,
+a przy wąskim oknie jedna. Ostatni, niepełny wiersz jest dopełniany pustymi
+miejscami (`dopelnijWiersz()`), żeby kafelki nie rozjeżdżały się na pół okna.
 
 **Skala** — wszystkie odstępy, czcionki i zaokrąglenia są liczone względem
-okna referencyjnego 360 × 640 dp przez funkcję `s()`, z ograniczeniem
-0.85–1.3. Elementy zajmujące stałą część wysokiego okna używają `wys(procent)`:
+okna referencyjnego 360 dp przez funkcję `s()`, z ograniczeniem 0.85–1.3. Elementy zajmujące stałą część wysokiego okna używają `wys(procent)`:
 
 | Element | Reguła | małe okno | domyślne okno | okno rozciągnięte |
 |---|---|---|---|---|
@@ -512,13 +521,12 @@ frontend/
     │   ├── klient/[id].tsx   WIDOK PROFILU — duży „DODAJ", zakładki, historia
     │   ├── klient/nowy.tsx   formularz + ostrzeżenie o duplikacie numeru
     │   ├── kalendarz.tsx     grafik warsztatu — cztery dni obok siebie
-    │   ├── wizyta/nowa.tsx   auto + tytuł + opis + priorytet + termin
+    │   ├── wizyta/nowa.tsx   auto + tytuł + opis + priorytet + WYMAGANY termin
     │   └── wizyta/[id].tsx   szczegóły, zmiana statusu
     └── komponenty/
         ├── EkranParowania.tsx     kod dla administratora + kod zaproszenia
         ├── EkranBlokady.tsx       ustawienie hasła i odblokowanie
-        ├── SiatkaDni.tsx          kilka dni obok siebie — ekran kalendarza
-        ├── SiatkaDnia.tsx         jedna doba z wizytami — wybór terminu
+        ├── SiatkaDni.tsx          siatka doby — kalendarz i wybór terminu
         ├── WyborTerminu.tsx       czas trwania wizyty wybierany palcem
         ├── KafelekWizyty.tsx      DUŻY vs MAŁY kafelek zależnie od statusu
         └── … (KafelekKlienta, ZakladkiAut, Formularz, Stany, Potwierdzenie)

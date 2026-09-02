@@ -22,26 +22,24 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useRouter } from 'expo-router';
 
 import { Przycisk, Sekcja } from '../komponenty/Formularz';
-import Potwierdzenie from '../komponenty/Potwierdzenie';
 import { pobierzMeta } from '../dane/baza';
 import { liczbaWKolejce } from '../dane/kolejka';
 import { pobierzIdUrzadzenia } from '../dane/sesja';
 import { useAplikacja } from '../dane/kontekst';
 import { WERSJA_APLIKACJI, WERSJA_SCHEMATU } from '../dane/konfiguracja';
 import { Kolory, Odstepy, Zaokraglenia } from '../motyw';
-import { s, wys } from '../uklad';
+import { SZEROKOSC_CZYTANIA, s, wys } from '../uklad';
 
 export default function EkranUstawien() {
   const router = useRouter();
   const {
-    sync, mechanik, warsztat, rola, czyAdministrator, synchronizuj, wyloguj, zablokuj,
+    sync, mechanik, warsztat, rola, czyAdministrator, synchronizuj, zablokuj,
   } = useAplikacja();
 
   const [urzadzenie, setUrzadzenie] = useState<string | null>(null);
   const [okno, setOkno] = useState<string | null>(null);
   const [wygasniecie, setWygasniecie] = useState<string | null>(null);
   const [wKolejce, setWKolejce] = useState(0);
-  const [pytanieOWylogowanie, setPytanieOWylogowanie] = useState(false);
 
   useEffect(() => {
     pobierzIdUrzadzenia().then(setUrzadzenie);
@@ -54,12 +52,6 @@ export default function EkranUstawien() {
     await synchronizuj({ wymuszona: true });
     setWKolejce(await liczbaWKolejce());
   }, [synchronizuj]);
-
-  const potwierdzWylogowanie = useCallback(async () => {
-    setPytanieOWylogowanie(false);
-    await wyloguj();
-    router.replace('/');
-  }, [wyloguj, router]);
 
   return (
     <ScrollView style={style.ekran} contentContainerStyle={style.tresc}>
@@ -124,7 +116,7 @@ export default function EkranUstawien() {
             Haslo podajesz raz - przy uruchomieniu programu. Przelaczenie sie na
             inne okno nie zamyka dostepu; blokada wraca dopiero po zamknieciu
             i ponownym otwarciu programu. Kiedy odchodzisz od komputera,
-            uzyj przycisku ponizej.
+            zablokuj aplikacje przyciskiem ponizej.
           </Text>
           <Text style={style.informacjaTekst}>
             Jesli ten komputer nie polaczy sie z serwerem przez {wygasniecie ?? '14'} dni,
@@ -140,33 +132,7 @@ export default function EkranUstawien() {
         </View>
 
         <Przycisk tytul="Zablokuj aplikacje teraz" wariant="drugi" onPress={zablokuj} />
-        <Przycisk
-          tytul="Wyloguj i wyczysc ten komputer"
-          wariant="niebezpieczny"
-          onPress={() => setPytanieOWylogowanie(true)}
-        />
-        <Text style={style.podpowiedz}>
-          Wylogowanie kasuje z dysku wszystkie dane warsztatu. Zrob to, zanim
-          oddasz ten komputer komukolwiek innemu.
-        </Text>
       </Sekcja>
-
-      {pytanieOWylogowanie ? (
-        <Potwierdzenie
-          widoczne
-          tytul="Wylogowac i wyczyscic dane?"
-          tresc={wKolejce > 0
-            ? `UWAGA: ${wKolejce} zmian nie zostalo jeszcze wyslanych na serwer i przepadnie. `
-              + 'Najpierw polacz sie z internetem i poczekaj, az licznik pokaze zero.'
-            : 'Wszystkie dane warsztatu znikna z tego komputera. Zeby wrocic do pracy, '
-              + 'administrator bedzie musial przyznac dostep od nowa.'}
-          tekstAkcji="Wyloguj i wyczysc"
-          tekstAnuluj="Anuluj"
-          wariant="niebezpieczny"
-          onAkcja={potwierdzWylogowanie}
-          onAnuluj={() => setPytanieOWylogowanie(false)}
-        />
-      ) : null}
     </ScrollView>
   );
 }
@@ -225,7 +191,13 @@ function Wiersz({ etykieta, wartosc, alarm }: {
 
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
-  tresc: { padding: Odstepy.l, paddingBottom: wys(8, 32) },
+  tresc: {
+    padding: Odstepy.l,
+    paddingBottom: wys(8, 32),
+    width: '100%',
+    maxWidth: SZEROKOSC_CZYTANIA,
+    alignSelf: 'center',
+  },
 
   paskiem: { alignItems: 'flex-end', marginBottom: Odstepy.s },
   znacznik: {

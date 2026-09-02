@@ -1,25 +1,39 @@
 /**
- * Metryki ukladu - caly interfejs jest projektowany pod WASKIE okno
- * o proporcjach okolo 9:16 (wysokie i waskie).
+ * Metryki ukladu - interfejs programu na komputer.
  *
- * Dwa zadania tego modulu:
+ * Ekrany zajmuja CALE okno, ale nie kazda tresc ma sie po nim rozlewac.
+ * Trzy szerokosci zalatwiaja caly uklad:
  *
- *  1. KOLUMNA 9:16 - tresc nigdy nie rozlewa sie szerzej niz 9/16 wysokosci
- *     okna. W domyslnym rozmiarze okna nic to nie zmienia (okno i tak jest
- *     wezsze), ale po zmaksymalizowaniu na szerokim monitorze aplikacja dalej
- *     wyglada jak narzedzie pracy, a nie jak rozciagnieta strona internetowa.
+ *   SZEROKOSC_TRESCI       listy i siatki kafelkow. Powyzej tej granicy
+ *                          tresc staje na srodku, zamiast ciagnac sie przez
+ *                          caly monitor.
+ *   SZEROKOSC_CZYTANIA     ekrany, ktore sie CZYTA (zgloszenie, ustawienia,
+ *                          zarzadzanie dostepem) - krotszy wiersz czyta sie
+ *                          latwiej niz metrowy.
+ *   SZEROKOSC_FORMULARZA   formularze. Pole tekstowe szerokie na cale okno
+ *                          wyglada jak blad, a nie jak pole.
  *
- *  2. SKALA - rozmiary sa liczone wzgledem okna referencyjnego 360 x 640 dp
- *     (dokladnie 9:16), wiec proporcje trzymaja sie tak samo na malym
- *     laptopie, jak i na duzym monitorze.
+ * Kalendarz jest wyjatkiem i bierze cale okno - cztery dni obok siebie
+ * potrzebuja miejsca.
+ *
+ * SKALA trzyma proporcje czcionek, odstepow i zaokraglen. Liczy sie ja raz,
+ * wzgledem okna referencyjnego 360 dp, i ogranicza z obu stron, zeby na
+ * czterech monitorach obok siebie interfejs nie urosl do absurdu.
  */
 import { Dimensions, Platform } from 'react-native';
 
-/** Proporcje ekranu, pod ktore projektowany jest interfejs. */
-export const PROPORCJA = 9 / 16; // 0.5625
-
-/** Okno referencyjne: 360 x 640 dp = dokladnie 9:16. */
+/** Okno referencyjne dla skali: 360 dp szerokosci. */
 const BAZA_SZEROKOSC = 360;
+
+/** Najwezsze okno, przy ktorym uklad jeszcze ma sens. */
+export const MINIMALNA_SZEROKOSC = 720;
+
+export const SZEROKOSC_TRESCI = 1320;
+export const SZEROKOSC_CZYTANIA = 940;
+export const SZEROKOSC_FORMULARZA = 760;
+
+/** Najwezszy kafelek na siatce - ponizej tego lepiej dac jedna kolumne mniej. */
+const MINIMALNY_KAFELEK = 380;
 
 export type Wymiary = { width: number; height: number };
 
@@ -28,8 +42,8 @@ export type Wymiary = { width: number; height: number };
  *
  * Na webie react-native-web startuje z wymiarami 0 x 0 i uzupelnia je dopiero
  * przy pierwszym zdarzeniu zmiany rozmiaru. Bez tego zabezpieczenia pierwsze
- * renderowanie widzialoby ekran o zerowej szerokosci i podejmowalo zle decyzje
- * o ukladzie. Na urzadzeniu Dimensions jest poprawne od razu.
+ * renderowanie widzialoby okno o zerowej szerokosci i podejmowalo zle decyzje
+ * o ukladzie.
  */
 export function pewneWymiary(wymiary?: Wymiary): Wymiary {
   const w = wymiary ?? Dimensions.get('window');
@@ -45,45 +59,48 @@ export function pewneWymiary(wymiary?: Wymiary): Wymiary {
 
 const { width: szerokoscEkranu, height: wysokoscEkranu } = pewneWymiary();
 
-/**
- * Szerokosc kolumny tresci dla podanego ekranu.
- * Nigdy nie przekracza 9/16 wysokosci - stad waski, wysoki ksztalt.
- */
-export function szerokoscKolumny(szerokosc: number, wysokosc: number): number {
-  return Math.min(szerokosc, Math.round(wysokosc * PROPORCJA));
-}
-
-/** Szerokosc kolumny dla rozmiaru okna z chwili uruchomienia. */
-export const SZEROKOSC_KOLUMNY = szerokoscKolumny(szerokoscEkranu, wysokoscEkranu);
-
 export const EKRAN = {
   szerokosc: szerokoscEkranu,
   wysokosc: wysokoscEkranu,
-  /** Rzeczywiste proporcje okna, np. 0.52 dla domyslnego rozmiaru. */
-  proporcja: szerokoscEkranu / wysokoscEkranu,
-  /** Czy okno jest wezsze niz 9:16. */
-  wyzszyNizReferencja: szerokoscEkranu / wysokoscEkranu < PROPORCJA,
 };
 
 const ograniczenie = (wartosc: number, min: number, max: number) =>
   Math.min(Math.max(wartosc, min), max);
 
 /**
- * Wspolczynnik skali wzgledem okna referencyjnego.
- * Ograniczony, zeby na duzym monitorze interfejs nie urosl do absurdu.
+ * Ile kolumn kafelkow zmiesci sie w podanej szerokosci. Kafelek klienta albo
+ * usterki ponizej ~380 dp robi sie nieczytelny, wiec wolimy mniej kolumn
+ * i szersze kafelki niz odwrotnie.
  */
-export const SKALA = ograniczenie(SZEROKOSC_KOLUMNY / BAZA_SZEROKOSC, 0.85, 1.3);
+export function kolumnyKafelkow(szerokosc: number, maks = 3): number {
+  const dostepna = Math.min(szerokosc, SZEROKOSC_TRESCI);
+  return ograniczenie(Math.floor(dostepna / MINIMALNY_KAFELEK), 1, maks);
+}
 
-/** Skaluje rozmiar (odstep, czcionke, promien) do biezacego ekranu. */
+/**
+ * Dopelnia liste pustymi miejscami do pelnego wiersza siatki. Bez tego
+ * dwa kafelki w ostatnim wierszu rozciagalyby sie na pol okna kazdy,
+ * a reszta listy zostawala waska - siatka wygladalaby na rozjechana.
+ */
+export function dopelnijWiersz<T>(lista: T[], kolumny: number): (T | null)[] {
+  if (kolumny < 2 || lista.length === 0) return lista;
+  const brakuje = (kolumny - (lista.length % kolumny)) % kolumny;
+  return brakuje ? [...lista, ...Array<null>(brakuje).fill(null)] : lista;
+}
+
+/** Wspolczynnik skali czcionek i odstepow wzgledem okna referencyjnego. */
+export const SKALA = ograniczenie(szerokoscEkranu / BAZA_SZEROKOSC, 0.85, 1.3);
+
+/** Skaluje rozmiar (odstep, czcionke, promien) do biezacego okna. */
 export const s = (rozmiar: number): number => Math.round(rozmiar * SKALA * 10) / 10;
 
 /**
- * Wysokosc jako procent wysokosci okna - dla elementow, ktore maja
- * zajmowac stala czesc wysokiego okna niezaleznie od jego rozmiaru.
+ * Wysokosc jako procent wysokosci okna - dla elementow, ktore maja zajmowac
+ * stala czesc okna niezaleznie od jego rozmiaru.
  */
 export function wys(procent: number, min = 0, max = Number.MAX_SAFE_INTEGER): number {
   return Math.round(ograniczenie((wysokoscEkranu * procent) / 100, min, max));
 }
 
-/** Minimalny wygodny cel klikniecia (te same 44 dp co w wytycznych mobilnych). */
+/** Minimalny wygodny cel klikniecia. */
 export const CEL_DOTYKU = Math.max(44, s(44));

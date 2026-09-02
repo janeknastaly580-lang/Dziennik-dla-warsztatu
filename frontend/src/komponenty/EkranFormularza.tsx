@@ -24,7 +24,7 @@ import { StyleSheet, ViewStyle } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { Kolory, Odstepy } from '../motyw';
-import { s, wys } from '../uklad';
+import { SZEROKOSC_FORMULARZA, s, wys } from '../uklad';
 
 export default function EkranFormularza({
   children,
@@ -53,7 +53,12 @@ const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
   tresc: {
     padding: Odstepy.l,
-    // Zapas na dole - ostatni przycisk nie chowa sie pod paskiem gestow.
+    // Zapas na dole - ostatni przycisk nie klei sie do krawedzi okna.
     paddingBottom: wys(10, 48),
+    // Pole tekstowe szerokie na caly monitor wyglada jak blad, a nie jak
+    // pole - formularz zostaje waski i staje na srodku okna.
+    width: '100%',
+    maxWidth: SZEROKOSC_FORMULARZA,
+    alignSelf: 'center',
   },
 });

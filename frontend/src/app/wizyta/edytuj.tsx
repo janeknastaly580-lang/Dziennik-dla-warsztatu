@@ -24,22 +24,12 @@ import WierszTerminu, { KalendarzTerminu } from '../../komponenty/WyborTerminu';
 import { Ladowanie } from '../../komponenty/Stany';
 import { pobierzWizyte, zaktualizujWizyte } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
-import { Kolory, Odstepy } from '../../motyw';
+import { Kolory, Odstepy, PRIORYTETY, etykietaPriorytetu } from '../../motyw';
 import {
   type Termin, domyslnyTermin, dzisiaj, formatujTermin, takiSam, terminWizyty,
 } from '../../termin';
 import { s } from '../../uklad';
 import type { Priorytet } from '../../typy';
-
-const PRIORYTETY: { wartosc: Priorytet; etykieta: string; kolor?: string }[] = [
-  { wartosc: 'niski', etykieta: 'Niski' },
-  { wartosc: 'normalny', etykieta: 'Normalny' },
-  { wartosc: 'wysoki', etykieta: 'Wysoki', kolor: Kolory.pilne },
-];
-
-const ETYKIETY_PRIORYTETU: Record<string, string> = {
-  niski: 'Niski', normalny: 'Normalny', wysoki: 'Wysoki',
-};
 
 type Wartosci = {
   auto: string; tytul: string; opis: string;
@@ -113,8 +103,8 @@ export default function EkranEdycjiWizyty() {
     if (poczatkowe.priorytet !== wartosci.priorytet) {
       opis.push({
         etykieta: 'Priorytet',
-        z: ETYKIETY_PRIORYTETU[poczatkowe.priorytet],
-        na: ETYKIETY_PRIORYTETU[wartosci.priorytet],
+        z: etykietaPriorytetu(poczatkowe.priorytet),
+        na: etykietaPriorytetu(wartosci.priorytet),
       });
     }
     if (!takiSam(poczatkowe.termin, wartosci.termin)) {

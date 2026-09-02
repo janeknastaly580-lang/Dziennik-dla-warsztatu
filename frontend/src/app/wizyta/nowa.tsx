@@ -10,8 +10,9 @@
  *   2. TYTUL  - krotka nazwa zgloszenia (jedyne pole wymagane).
  *   3. OPIS   - szczegoly usterki.
  *   4. TERMIN - dzien i godziny wybierane palcem na siatce kalendarza.
- *               Ustawiony z gory na najblizsza godzine, wiec mechanik,
- *               ktoremu termin jest obojetny, po prostu go nie dotyka.
+ *               WYMAGANY: zgloszenie bez terminu nie powstanie. Kalendarz
+ *               warsztatu ma pokazywac wszystko, co jest do zrobienia,
+ *               a wizyta bez godzin nie trafilaby na zadna siatke.
  *
  * Statusu tu nie ma - kazde nowe zgloszenie startuje jako "nienaprawione".
  *
@@ -32,15 +33,9 @@ import { otwartaWizytaTegoAuta, utworzWizyte } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { formatujDate } from '../../format';
 import { type Termin, domyslnyTermin } from '../../termin';
-import { Kolory, Odstepy, Zaokraglenia } from '../../motyw';
+import { Kolory, Odstepy, PRIORYTETY, Zaokraglenia } from '../../motyw';
 import { s } from '../../uklad';
 import type { Priorytet, Wizyta } from '../../typy';
-
-const PRIORYTETY: { wartosc: Priorytet; etykieta: string; kolor?: string }[] = [
-  { wartosc: 'niski', etykieta: 'Niski' },
-  { wartosc: 'normalny', etykieta: 'Normalny' },
-  { wartosc: 'wysoki', etykieta: 'Wysoki', kolor: Kolory.pilne },
-];
 
 export default function EkranNowaWizyta() {
   const router = useRouter();
@@ -51,7 +46,8 @@ export default function EkranNowaWizyta() {
   const [tytul, setTytul] = useState('');
   const [opis, setOpis] = useState('');
   const [priorytet, setPriorytet] = useState<Priorytet>('normalny');
-  const [termin, setTermin] = useState<Termin>(() => domyslnyTermin());
+  /* null, dopoki mechanik nie wskaze terminu na siatce - patrz `zapisz`. */
+  const [termin, setTermin] = useState<Termin | null>(null);
   const [kalendarz, setKalendarz] = useState(false);
 
   const [podobna, setPodobna] = useState<Wizyta | null>(null);
@@ -72,6 +68,10 @@ export default function EkranNowaWizyta() {
     }
     if (!tytul.trim()) {
       setBlad('Wpisz krotki tytul wizyty, np. "Stukanie w zawieszeniu".');
+      return;
+    }
+    if (!termin) {
+      setBlad('Wybierz termin wizyty - dotknij pola TERMIN i zaznacz godziny w kalendarzu.');
       return;
     }
 
@@ -172,7 +172,7 @@ export default function EkranNowaWizyta() {
           przykrylaby tylko swoja sekcje zamiast calego ekranu. */}
       {kalendarz ? (
         <KalendarzTerminu
-          wartosc={termin}
+          wartosc={termin ?? domyslnyTermin()}
           onGotowe={(t) => { setTermin(t); setKalendarz(false); }}
           onAnuluj={() => setKalendarz(false)}
         />

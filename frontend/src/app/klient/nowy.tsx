@@ -17,6 +17,7 @@ import EkranFormularza from '../../komponenty/EkranFormularza';
 import { KomunikatFormularza, Pole, Przycisk, Sekcja } from '../../komponenty/Formularz';
 import { klienciZTymSamymTelefonem, utworzKlienta } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
+import { POLA_KLIENTA, PUSTY_KLIENT, type WartosciKlienta } from '../../polaKlienta';
 import { Kolory, Odstepy, Zaokraglenia } from '../../motyw';
 import { s } from '../../uklad';
 import type { KlientNaLiscie } from '../../typy';
@@ -24,13 +25,7 @@ import type { KlientNaLiscie } from '../../typy';
 export default function EkranNowyKlient() {
   const router = useRouter();
 
-  const [nazwa, setNazwa] = useState('');
-  const [telefon, setTelefon] = useState('');
-  const [email, setEmail] = useState('');
-  const [adres, setAdres] = useState('');
-  const [nip, setNip] = useState('');
-  const [notatki, setNotatki] = useState('');
-
+  const [wartosci, setWartosci] = useState<WartosciKlienta>(PUSTY_KLIENT);
   const [podobni, setPodobni] = useState<KlientNaLiscie[]>([]);
   const [zapisywanie, setZapisywanie] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
@@ -38,28 +33,28 @@ export default function EkranNowyKlient() {
   // B3: ostrzezenie pojawia sie na zywo, w trakcie wpisywania numeru.
   useEffect(() => {
     let aktywny = true;
-    klienciZTymSamymTelefonem(telefon).then((lista) => {
+    klienciZTymSamymTelefonem(wartosci.telefon).then((lista) => {
       if (aktywny) setPodobni(lista);
     });
     return () => { aktywny = false; };
-  }, [telefon]);
+  }, [wartosci.telefon]);
 
   const zapisz = useCallback(async () => {
-    if (!nazwa.trim()) {
+    if (!wartosci.nazwa.trim()) {
       setBlad('Podaj imie i nazwisko lub nazwe firmy.');
       return;
     }
     setZapisywanie(true);
     setBlad(null);
     try {
-      const id = await utworzKlienta({ nazwa, telefon, email, adres, nip, notatki });
+      const id = await utworzKlienta(wartosci);
       await odswiezLicznikiKolejki();
       router.replace(`/klient/${id}`);
     } catch (err) {
       setBlad(err instanceof Error ? err.message : 'Nie udalo sie zapisac klienta.');
       setZapisywanie(false);
     }
-  }, [nazwa, telefon, email, adres, nip, notatki, router]);
+  }, [wartosci, router]);
 
   return (
     <EkranFormularza>
@@ -82,38 +77,20 @@ export default function EkranNowyKlient() {
         ) : null}
 
         <Sekcja tytul="DANE KLIENTA">
-          <Pole
-            etykieta="Imie i nazwisko / nazwa firmy"
-            wymagane
-            value={nazwa}
-            onChangeText={setNazwa}
-            placeholder="np. Jan Kowalski"
-            autoFocus
-          />
-          <Pole
-            etykieta="Telefon"
-            value={telefon}
-            onChangeText={setTelefon}
-            placeholder="np. 601 234 567"
-            keyboardType="phone-pad"
-          />
-          <Pole
-            etykieta="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="np. jan@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <Pole etykieta="Adres" value={adres} onChangeText={setAdres} placeholder="ulica, kod, miasto" />
-          <Pole etykieta="NIP (firma)" value={nip} onChangeText={setNip} keyboardType="number-pad" />
-          <Pole
-            etykieta="Notatki"
-            value={notatki}
-            onChangeText={setNotatki}
-            placeholder="np. faktura 14 dni, kontakt po 16:00"
-            multiline
-          />
+          {POLA_KLIENTA.map((pole, i) => (
+            <Pole
+              key={pole.klucz}
+              etykieta={pole.etykieta}
+              wymagane={'wymagane' in pole ? pole.wymagane : undefined}
+              value={wartosci[pole.klucz]}
+              onChangeText={(t) => setWartosci((w) => ({ ...w, [pole.klucz]: t }))}
+              placeholder={'placeholder' in pole ? pole.placeholder : undefined}
+              keyboardType={'klawiatura' in pole ? pole.klawiatura : undefined}
+              autoCapitalize={'bezWielkichLiter' in pole ? 'none' : 'sentences'}
+              multiline={'wiele' in pole ? pole.wiele : undefined}
+              autoFocus={i === 0}
+            />
+          ))}
         </Sekcja>
 
         <Text style={style.podpowiedz}>

@@ -1,56 +1,141 @@
 /**
- * Kalendarz kilku dni obok siebie.
+ * Siatka doby - jedna dla obu miejsc, w ktorych aplikacja rysuje godziny:
+ * kalendarza warsztatu (cztery dni obok siebie) i wyboru terminu wizyty
+ * (jeden dzien, z przeciaganym blokiem).
  *
- * Godziny stoja w stalej kolumnie po lewej, a kazdy dzien dostaje wlasna
- * kolumne z wizytami narysowanymi na wysokosci swojego czasu trwania.
- * Wizyty, ktore w jednym dniu zachodza na siebie, dziela szerokosc TEJ
- * kolumny - dokladnie tak samo, jak w widoku jednego dnia (`SiatkaDnia`),
- * z ktorego bierzemy uklad i wymiary.
+ * Godziny stoja w stalej kolumnie po lewej, kazdy dzien dostaje wlasna
+ * kolumne, a wizyty ida na wysokosci swojego czasu trwania. Te, ktore w
+ * jednym dniu zachodza na siebie, dziela szerokosc TEJ kolumny - inaczej
+ * pozniejsza zaslanialaby wczesniejsza i nie dalo by sie w nia wejsc.
+ *
+ * Roznice miedzy oboma widokami sprowadzaja sie do kilku propsow:
+ *
+ *   kalendarz       `dni` z czterema dniami i `onWizyta` (bloki klikalne).
+ *                   Dochodzi naglowek z nazwami dni i czerwona linia "teraz".
+ *   wybor terminu   `dni` z jednym dniem, `rezerwacjaOd/Do` (wybierany blok
+ *                   wchodzi do ukladu kolumn, wiec nie zaslania zajetych
+ *                   godzin), `tlo` z gestem i `children` na wierzchu siatki.
  *
  * Naglowek z dniami stoi NAD przewijana siatka, wiec nazwy dni zostaja na
  * ekranie, kiedy mechanik przewija dobe w gore i w dol.
- *
- * Czerwona linia to biezaca godzina. Rysuje sie tylko wtedy, gdy dzisiejszy
- * dzien jest w widocznym zakresie - inaczej mowilaby o czasie, ktorego na
- * ekranie nie ma.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent,
+  Pressable, ScrollView, StyleSheet, Text, View,
+  type GestureResponderHandlers, type LayoutChangeEvent,
 } from 'react-native';
 
-import {
-  PIKSELE_NA_MINUTE, SZEROKOSC_GODZIN, WYSOKOSC_SIATKI, WYS_GODZINY,
-  pozycjaWizyty, ulozPozycje,
-} from './SiatkaDnia';
 import { Kolory, Odstepy, Zaokraglenia, cien, opisStatusu } from '../motyw';
-import { dzisiaj, etykietaKolumny, etykietaKrotka, naGodzine, terazMinuty } from '../termin';
+import {
+  DZIEN, MIN_DLUGOSC, dzisiaj, etykietaKolumny, naGodzine, naMinuty, terazMinuty,
+} from '../termin';
 import { s } from '../uklad';
 import type { Wizyta } from '../typy';
 
-const GODZINY = Array.from({ length: 24 }, (_, i) => i);
-/** Odstep miedzy blokiem a prawa krawedzia jego kolumny. */
-const LUZ_KOLUMNY = s(6);
+/** Wysokosc jednej godziny - z niej wynikaja wszystkie pozycje na siatce. */
+export const WYS_GODZINY = s(56);
+export const PIKSELE_NA_MINUTE = WYS_GODZINY / 60;
+/** Kolumna z godzinami po lewej. */
+export const SZEROKOSC_GODZIN = s(50);
+const WYSOKOSC_SIATKI = DZIEN * PIKSELE_NA_MINUTE;
+/** Zapas przy prawej krawedzi kolumny dnia. */
+const LUZ_DNIA = Odstepy.s;
+/** Odstep miedzy blokami, ktore dziela te sama godzine. */
+const LUZ_BLOKU = s(3);
 /** Co ile odswieza sie linia biezacej godziny. */
 const ODSWIEZANIE_LINII_MS = 60_000;
 
+const GODZINY = Array.from({ length: 24 }, (_, i) => i);
+/** Klucz pozycji, ktora nie jest wizyta, tylko wlasnie wybieranym terminem. */
+const REZERWACJA = '@rezerwacja';
+
+type Pozycja = { id: string; od: number; koniec: number; wizyta?: Wizyta };
+type Ulozona = Pozycja & { kolumna: number; kolumn: number };
+
+/** Gdzie i jak szeroko rysowac blok - to samo dla wizyt i dla rezerwacji. */
+export type PolozenieBloku = { left: number; width: number };
+
+/** Wizyta sprowadzona do dwoch liczb: poczatku i konca w minutach doby. */
+function pozycjaWizyty(wizyta: Wizyta): Pozycja {
+  const od = naMinuty(wizyta.godzina_od);
+  return {
+    id: wizyta.id,
+    od,
+    koniec: Math.max(naMinuty(wizyta.godzina_do), od + MIN_DLUGOSC),
+    wizyta,
+  };
+}
+
+/**
+ * Rozklada pozycje na kolumny: kazda dostaje pierwsza wolna kolumne wsrod
+ * tych, z ktorymi sie zazebia. Grupa konczy sie, gdy nowa pozycja zaczyna
+ * sie po najpozniejszym dotychczasowym koncu - wtedy szerokosc wraca do
+ * calej kolumny dnia.
+ */
+function ulozPozycje(wejscie: Pozycja[]): Ulozona[] {
+  const pozycje = [...wejscie].sort((a, b) => a.od - b.od || a.koniec - b.koniec);
+
+  const wynik: Ulozona[] = [];
+  let grupa: Ulozona[] = [];
+  let koniecGrupy = -1;
+
+  const zamknijGrupe = () => {
+    const kolumn = grupa.reduce((maks, p) => Math.max(maks, p.kolumna + 1), 1);
+    grupa.forEach((p) => { p.kolumn = kolumn; });
+    grupa = [];
+  };
+
+  for (const pozycja of pozycje) {
+    if (grupa.length && pozycja.od >= koniecGrupy) {
+      zamknijGrupe();
+      koniecGrupy = -1;
+    }
+    const zajete = new Set(
+      grupa.filter((p) => p.koniec > pozycja.od).map((p) => p.kolumna),
+    );
+    let kolumna = 0;
+    while (zajete.has(kolumna)) kolumna += 1;
+
+    const ulozona: Ulozona = { ...pozycja, kolumna, kolumn: 1 };
+    grupa.push(ulozona);
+    wynik.push(ulozona);
+    koniecGrupy = Math.max(koniecGrupy, pozycja.koniec);
+  }
+  if (grupa.length) zamknijGrupe();
+
+  return wynik;
+}
+
 type Props = {
-  /** Dni pokazywane obok siebie, po kolei. */
+  /** Dni pokazywane obok siebie, po kolei. Jeden dzien = wybor terminu. */
   dni: string[];
   wizyty: Wizyta[];
   /** Minuta, na ktorej ma stanac widok po wejsciu i po zmianie zakresu. */
   przewinDo?: number | null;
   /** Wizyta narysowana mocniej - ta, z ktorej mechanik tu przyszedl. */
   wyrozniona?: string | null;
-  onWizyta: (wizyta: Wizyta) => void;
+  /** Gdy podane, bloki wizyt sa klikalne. */
+  onWizyta?: (wizyta: Wizyta) => void;
+  /** Uchwyty gestu dla pustego tla siatki. */
+  tlo?: GestureResponderHandlers;
+  /** Godziny wybieranego terminu - dziela szerokosc z wizytami tego dnia. */
+  rezerwacjaOd?: number | null;
+  rezerwacjaDo?: number | null;
+  /** Ukrywa etykiete godziny (bo zaslania ja godzina krawedzi bloku). */
+  ukryjGodzine?: (y: number) => boolean;
+  /** Rysowane na wierzchu siatki - blok wybieranego terminu z uchwytami. */
+  children?: React.ReactNode | ((polozenie: PolozenieBloku) => React.ReactNode);
 };
 
 export default function SiatkaDni({
-  dni, wizyty, przewinDo, wyrozniona, onWizyta,
+  dni, wizyty, przewinDo, wyrozniona, onWizyta, tlo,
+  rezerwacjaOd, rezerwacjaDo, ukryjGodzine, children,
 }: Props) {
   const przewijanie = useRef<ScrollView>(null);
   const [szerokosc, setSzerokosc] = useState(0);
   const [teraz, setTeraz] = useState(() => terazMinuty());
+
+  const wieleDni = dni.length > 1;
 
   const zmierz = useCallback((zdarzenie: LayoutChangeEvent) => {
     setSzerokosc(zdarzenie.nativeEvent.layout.width);
@@ -67,47 +152,68 @@ export default function SiatkaDni({
 
   /* Linia "teraz" przesuwa sie co minute; czesciej nie ma czego pokazywac. */
   useEffect(() => {
+    if (!wieleDni) return;
     const zegar = setInterval(() => setTeraz(terazMinuty()), ODSWIEZANIE_LINII_MS);
     return () => clearInterval(zegar);
-  }, []);
+  }, [wieleDni]);
+
+  /** Wizyty rozdzielone na dni, w kazdym dniu ulozone w kolumny. */
+  const ulozone = useMemo(() => dni.map((dzien) => {
+    const pozycje = wizyty
+      .filter((w) => String(w.data_wizyty ?? '').slice(0, 10) === dzien)
+      .map(pozycjaWizyty);
+
+    // Wybierany termin wchodzi do ukladu na rowni z wizytami, wiec nie
+    // zaslania tego, co juz stoi o tej porze.
+    if (rezerwacjaOd !== null && rezerwacjaOd !== undefined
+      && rezerwacjaDo !== null && rezerwacjaDo !== undefined) {
+      pozycje.push({ id: REZERWACJA, od: rezerwacjaOd, koniec: rezerwacjaDo });
+    }
+    return ulozPozycje(pozycje);
+  }), [dni, wizyty, rezerwacjaOd, rezerwacjaDo]);
 
   const szerokoscDnia = dni.length
     ? Math.max(0, szerokosc - SZEROKOSC_GODZIN) / dni.length
     : 0;
+  const dostepna = Math.max(0, szerokoscDnia - LUZ_DNIA);
 
-  /** Wizyty rozdzielone na dni i ulozone w kolumny wewnatrz kazdego dnia. */
-  const ulozone = useMemo(() => dni.map((dzien) => ulozPozycje(
-    wizyty.filter((w) => String(w.data_wizyty ?? '').slice(0, 10) === dzien)
-      .map(pozycjaWizyty),
-  )), [dni, wizyty]);
+  const polozenie = (dzien: number, kolumna: number, kolumn: number): PolozenieBloku => ({
+    left: SZEROKOSC_GODZIN + dzien * szerokoscDnia + kolumna * (dostepna / kolumn),
+    width: dostepna / kolumn - (kolumn > 1 ? LUZ_BLOKU : 0),
+  });
+
+  const rezerwacja = ulozone[0]?.find((p) => p.id === REZERWACJA);
+  const polozenieRezerwacji = rezerwacja
+    ? polozenie(0, rezerwacja.kolumna, rezerwacja.kolumn)
+    : { left: SZEROKOSC_GODZIN, width: dostepna };
 
   const dzis = dzisiaj();
-  const kolumnaDzis = dni.indexOf(dzis);
 
   return (
     <View style={style.calosc}>
-      {/* Naglowek z dniami - zostaje na ekranie przy przewijaniu doby. */}
-      <View style={style.naglowek} onLayout={zmierz}>
-        <View style={style.naglowekGodziny} />
-        {dni.map((dzien) => (
-          <View
-            key={dzien}
-            style={[
-              style.naglowekDnia,
-              { width: szerokoscDnia || undefined, flex: szerokoscDnia ? undefined : 1 },
-              dzien === dzis && style.naglowekDzis,
-            ]}
-          >
-            {dzien === dzis ? <Text style={style.podpisDzis}>Dzis</Text> : null}
-            <Text
-              style={[style.nazwaDnia, dzien === dzis && style.nazwaDniaDzis]}
-              numberOfLines={1}
+      {wieleDni ? (
+        <View style={style.naglowek}>
+          <View style={style.naglowekGodziny} />
+          {dni.map((dzien) => (
+            <View
+              key={dzien}
+              style={[
+                style.naglowekDnia,
+                { width: szerokoscDnia || undefined, flex: szerokoscDnia ? undefined : 1 },
+                dzien === dzis && style.naglowekDzis,
+              ]}
             >
-              {etykietaKolumny(dzien)}
-            </Text>
-          </View>
-        ))}
-      </View>
+              {dzien === dzis ? <Text style={style.podpisDzis}>Dzis</Text> : null}
+              <Text
+                style={[style.nazwaDnia, dzien === dzis && style.nazwaDniaDzis]}
+                numberOfLines={1}
+              >
+                {etykietaKolumny(dzien)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <ScrollView
         ref={przewijanie}
@@ -115,67 +221,90 @@ export default function SiatkaDni({
         contentContainerStyle={style.tresc}
         showsVerticalScrollIndicator={false}
       >
-        <View style={style.siatka}>
+        <View style={style.siatka} onLayout={zmierz}>
+          {tlo ? <View style={style.tlo} {...tlo} /> : null}
+
           {/* Linie godzin i podzial na dni */}
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {GODZINY.map((godzina) => (
-              <View key={godzina} style={[style.linia, { top: godzina * WYS_GODZINY }]}>
-                <Text style={style.liniaGodzina}>{naGodzine(godzina * 60)}</Text>
-              </View>
-            ))}
-            {dni.map((dzien, i) => (
+            {GODZINY.map((godzina) => {
+              const y = godzina * WYS_GODZINY;
+              return (
+                <View key={godzina} style={[style.linia, { top: y }]}>
+                  {ukryjGodzine?.(y) ? null : (
+                    <Text style={style.liniaGodzina}>{naGodzine(godzina * 60)}</Text>
+                  )}
+                </View>
+              );
+            })}
+            {wieleDni ? dni.map((dzien, i) => (
               <View
                 key={dzien}
                 style={[style.kreskaDnia, { left: SZEROKOSC_GODZIN + i * szerokoscDnia }]}
               />
-            ))}
+            )) : null}
           </View>
 
           {/* Wizyty - kazda w kolumnie swojego dnia */}
-          {szerokoscDnia > 0 ? ulozone.map((wDniu, i) => wDniu.map(
+          {dostepna > 0 ? ulozone.map((wDniu, i) => wDniu.map(
             ({ wizyta, od, koniec, kolumna, kolumn }) => {
               if (!wizyta) return null;
               const kolory = opisStatusu(wizyta.status);
-              const szerokoscBloku = (szerokoscDnia - LUZ_KOLUMNY) / kolumn;
+              const wymiary = {
+                top: od * PIKSELE_NA_MINUTE,
+                height: (koniec - od) * PIKSELE_NA_MINUTE,
+                ...polozenie(i, kolumna, kolumn),
+                backgroundColor: kolory.tlo,
+                borderColor: kolory.obramowanie,
+                borderLeftColor: kolory.kolor,
+              };
+              const tresc = (
+                <>
+                  <Text style={style.wizytaTytul} numberOfLines={1}>{wizyta.tytul}</Text>
+                  <Text style={style.wizytaPodpis} numberOfLines={1}>
+                    {naGodzine(od)}
+                    {'–'}
+                    {naGodzine(koniec)}
+                    {wizyta.klient_nazwa ? `  ·  ${wizyta.klient_nazwa}` : ''}
+                  </Text>
+                </>
+              );
 
-              return (
+              return onWizyta ? (
                 <Pressable
                   key={wizyta.id}
                   onPress={() => onWizyta(wizyta)}
                   accessibilityRole="button"
                   accessibilityLabel={
-                    `${wizyta.tytul}, ${etykietaKrotka(dni[i])}, `
+                    `${wizyta.tytul}, ${etykietaKolumny(dni[i])}, `
                     + `${naGodzine(od)} do ${naGodzine(koniec)}`
                   }
                   style={({ pressed }) => [
                     style.wizyta,
-                    {
-                      top: od * PIKSELE_NA_MINUTE,
-                      height: (koniec - od) * PIKSELE_NA_MINUTE,
-                      left: SZEROKOSC_GODZIN + i * szerokoscDnia + kolumna * szerokoscBloku,
-                      width: szerokoscBloku - (kolumn > 1 ? s(2) : 0),
-                      backgroundColor: kolory.tlo,
-                      borderColor: kolory.obramowanie,
-                      borderLeftColor: kolory.kolor,
-                    },
+                    wymiary,
                     wizyta.id === wyrozniona && style.wizytaWyrozniona,
                     pressed && style.wizytaWcisnieta,
                   ]}
                 >
-                  <Text style={style.wizytaTytul} numberOfLines={1}>{wizyta.tytul}</Text>
-                  <Text style={style.wizytaPodpis} numberOfLines={1}>
-                    {naGodzine(od)}
-                    {'-'}
-                    {naGodzine(koniec)}
-                    {wizyta.klient_nazwa ? ` · ${wizyta.klient_nazwa}` : ''}
-                  </Text>
+                  {tresc}
                 </Pressable>
+              ) : (
+                <View
+                  key={wizyta.id}
+                  pointerEvents="none"
+                  style={[
+                    style.wizyta,
+                    wymiary,
+                    wizyta.id === wyrozniona && style.wizytaWyrozniona,
+                  ]}
+                >
+                  {tresc}
+                </View>
               );
             },
           )) : null}
 
-          {/* Biezaca godzina - tylko gdy dzis jest w tym zakresie */}
-          {kolumnaDzis >= 0 ? (
+          {/* Biezaca godzina - tylko w kalendarzu i tylko gdy dzis tu jest */}
+          {wieleDni && dni.includes(dzis) ? (
             <View
               pointerEvents="none"
               style={[style.teraz, { top: teraz * PIKSELE_NA_MINUTE }]}
@@ -184,6 +313,8 @@ export default function SiatkaDni({
               <View style={style.terazKreska} />
             </View>
           ) : null}
+
+          {typeof children === 'function' ? children(polozenieRezerwacji) : children}
         </View>
       </ScrollView>
     </View>
@@ -223,6 +354,13 @@ const style = StyleSheet.create({
     height: WYSOKOSC_SIATKI,
     backgroundColor: Kolory.powierzchnia,
   },
+  tlo: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: SZEROKOSC_GODZIN,
+    right: 0,
+  },
   linia: {
     position: 'absolute',
     left: 0,
@@ -257,14 +395,16 @@ const style = StyleSheet.create({
     paddingVertical: 2,
     overflow: 'hidden',
   },
+  // Wizyta, po ktora mechanik tu przyszedl: ramka w kolorze akcentu.
+  // Status dalej widac po tle i po grubym pasku z lewej.
   wizytaWyrozniona: {
     borderWidth: s(2.5),
     borderColor: Kolory.akcent,
     ...cien('lekki'),
   },
   wizytaWcisnieta: { opacity: 0.75 },
-  wizytaTytul: { fontSize: s(11.5), fontWeight: '700', color: Kolory.tekstDrugi },
-  wizytaPodpis: { fontSize: s(10), color: Kolory.tekstSlaby },
+  wizytaTytul: { fontSize: s(12), fontWeight: '700', color: Kolory.tekstDrugi },
+  wizytaPodpis: { fontSize: s(10.5), color: Kolory.tekstSlaby },
 
   teraz: {
     position: 'absolute',

@@ -12,7 +12,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  FlatList, Pressable, RefreshControl, StyleSheet, Text, View,
+  FlatList, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 
@@ -22,7 +22,9 @@ import { otwarteUsterki } from '../dane/repozytorium';
 import { useAplikacja } from '../dane/kontekst';
 import { odmiana } from '../format';
 import { Kolory, Odstepy, Zaokraglenia, wagaPriorytetu } from '../motyw';
-import { CEL_DOTYKU, s, wys } from '../uklad';
+import {
+  CEL_DOTYKU, SZEROKOSC_TRESCI, dopelnijWiersz, kolumnyKafelkow, pewneWymiary, s, wys,
+} from '../uklad';
 import type { Wizyta } from '../typy';
 
 /** Filtr statusu; null = pelna lista otwartych usterek. */
@@ -38,6 +40,8 @@ const KOLEJNOSC_STATUSU: Record<string, number> = {
 export default function EkranOtwartychUsterek() {
   const router = useRouter();
   const { synchronizuj } = useAplikacja();
+  const { width } = pewneWymiary(useWindowDimensions());
+  const kolumny = kolumnyKafelkow(width);
 
   const [usterki, setUsterki] = useState<Wizyta[]>([]);
   const [filtr, setFiltr] = useState<Filtr>(null);
@@ -135,14 +139,21 @@ export default function EkranOtwartychUsterek() {
       </View>
 
       <FlatList
-        data={widoczne}
-        keyExtractor={(w) => w.id}
+        data={dopelnijWiersz(widoczne, kolumny)}
+        keyExtractor={(w, i) => w?.id ?? `pusty-${i}`}
+        key={`kolumny-${kolumny}`}
+        numColumns={kolumny}
+        columnWrapperStyle={kolumny > 1 ? style.wiersz : undefined}
         renderItem={({ item }) => (
-          <KafelekWizyty
-            wizyta={item}
-            klient={item.klient_nazwa}
-            onPress={() => router.push(`/wizyta/${item.id}`)}
-          />
+          <View style={style.komorka}>
+            {item ? (
+              <KafelekWizyty
+                wizyta={item}
+                klient={item.klient_nazwa}
+                onPress={() => router.push(`/wizyta/${item.id}`)}
+              />
+            ) : null}
+          </View>
         )}
         contentContainerStyle={style.lista}
         refreshControl={
@@ -246,5 +257,13 @@ const style = StyleSheet.create({
   informacja: {
     fontSize: s(12.5), fontWeight: '600', color: Kolory.tekstSlaby, marginTop: Odstepy.s,
   },
-  lista: { padding: Odstepy.l, paddingBottom: wys(6, 32) },
+  wiersz: { gap: Odstepy.m, alignItems: 'flex-start' },
+  komorka: { flex: 1, minWidth: 0 },
+  lista: {
+    width: '100%',
+    maxWidth: SZEROKOSC_TRESCI,
+    alignSelf: 'center',
+    padding: Odstepy.l,
+    paddingBottom: wys(6, 32),
+  },
 });

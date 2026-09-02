@@ -282,17 +282,6 @@ export function zatwierdzUrzadzenie(token: string, kod: string) {
   >;
 }
 
-/**
- * Starsza droga: kod + recznie wskazane konto mechanika. Aplikacja jej juz
- * nie uzywa (zostala zastapiona przez `zatwierdzUrzadzenie`), ale serwer
- * nadal ja obsluguje - na komputerach moze jeszcze chodzic poprzednia wersja.
- */
-export function przyznajDostep(token: string, kod: string, mechanikId: string) {
-  return wywolaj('admin', {
-    akcja: 'przyznaj', kod, mechanik_id: mechanikId,
-  }, token) as Promise<WynikAkcji>;
-}
-
 export function zablokujMechanika(token: string, mechanikId: string, powod?: string) {
   return wywolaj('admin', {
     akcja: 'zablokuj_mechanika', mechanik_id: mechanikId, powod,

@@ -19,7 +19,6 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-import KolumnaEkranu from '../komponenty/KolumnaEkranu';
 import EkranParowania from '../komponenty/EkranParowania';
 import { EkranOdblokowania, EkranUstawieniaHasla } from '../komponenty/EkranBlokady';
 import { KomunikatBledu, Ladowanie } from '../komponenty/Stany';
@@ -142,10 +141,7 @@ export default function UkladGlowny() {
       <KeyboardProvider>
         <AplikacjaProvider>
         <StatusBar style="dark" />
-        {/* Cala aplikacja siedzi w waskiej kolumnie o proporcjach 9:16. */}
-        <KolumnaEkranu>
-          <Bramka />
-        </KolumnaEkranu>
+        <Bramka />
         </AplikacjaProvider>
       </KeyboardProvider>
     </SafeAreaProvider>

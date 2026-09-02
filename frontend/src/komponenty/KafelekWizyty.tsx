@@ -10,8 +10,8 @@
  * byla widoczna na pierwszy rzut oka podczas przewijania historii.
  *
  * Wysokosc duzego kafelka jest liczona jako procent wysokosci ekranu, wiec na
- * wysokim ekranie 9:16 zawsze zajmuje ta sama czesc widoku - niezaleznie od
- * tego, czy komputer jest maly czy duzy.
+ * kazdym oknie zajmuje ta sama czesc jego wysokosci - niezaleznie od tego,
+ * czy okno jest male, czy rozciagniete na caly monitor.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -114,7 +114,7 @@ const duzy = StyleSheet.create({
     paddingVertical: Odstepy.l,
     paddingHorizontal: Odstepy.l,
     marginBottom: Odstepy.m,
-    // ok. 1/6 wysokosci ekranu - na widoku 9:16 mieszcza sie 3-4 otwarte usterki
+    // ok. 1/6 wysokosci okna - w kolumnie mieszcza sie 3-4 otwarte usterki
     minHeight: wys(16, 132),
     ...cien('mocny'),
   },

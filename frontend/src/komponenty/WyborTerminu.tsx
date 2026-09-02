@@ -30,7 +30,7 @@ import {
 
 import { Przycisk } from './Formularz';
 import PasekDnia from './PasekDnia';
-import SiatkaDnia, { PIKSELE_NA_MINUTE } from './SiatkaDnia';
+import SiatkaDni, { PIKSELE_NA_MINUTE } from './SiatkaDni';
 import { wizytyDnia } from '../dane/repozytorium';
 import { Kolory, Odstepy, Zaokraglenia, cien } from '../motyw';
 import {
@@ -57,26 +57,39 @@ const ogranicz = (wartosc: number, min: number, max: number) =>
 export default function WierszTerminu({
   wartosc, onNacisnij,
 }: {
-  wartosc: Termin;
+  /** null = termin jeszcze nie wybrany (nowe zgloszenie). */
+  wartosc: Termin | null;
   onNacisnij: () => void;
 }) {
-  const dzien = [wzgledemDzis(wartosc.data), etykietaDnia(wartosc.data)]
-    .filter(Boolean).join(' · ');
+  const dzien = wartosc
+    ? [wzgledemDzis(wartosc.data), etykietaDnia(wartosc.data)].filter(Boolean).join(' · ')
+    : 'Wybierz termin';
 
   return (
     <Pressable
       onPress={() => { Keyboard.dismiss(); onNacisnij(); }}
       accessibilityRole="button"
-      accessibilityLabel={`Termin: ${dzien}, ${formatujGodziny(wartosc)}`}
-      style={({ pressed }) => [style.wiersz, pressed && style.wierszWcisniety]}
+      accessibilityLabel={wartosc
+        ? `Termin: ${dzien}, ${formatujGodziny(wartosc)}`
+        : 'Wybierz termin wizyty w kalendarzu'}
+      style={({ pressed }) => [
+        style.wiersz,
+        !wartosc && style.wierszPusty,
+        pressed && style.wierszWcisniety,
+      ]}
     >
       <View style={style.wierszTresc}>
-        <Text style={style.wierszDzien}>{dzien}</Text>
-        <Text style={style.wierszGodziny}>
-          {formatujGodziny(wartosc)}
-          {'   ·   '}
-          {formatujCzasTrwania(dlugosc(wartosc))}
+        <Text style={[style.wierszDzien, !wartosc && style.wierszDzienPusty]}>
+          {dzien}
+          {wartosc ? null : <Text style={style.gwiazdka}> *</Text>}
         </Text>
+        {wartosc ? (
+          <Text style={style.wierszGodziny}>
+            {formatujGodziny(wartosc)}
+            {'   ·   '}
+            {formatujCzasTrwania(dlugosc(wartosc))}
+          </Text>
+        ) : null}
       </View>
       <Text style={style.wierszStrzalka}>{'›'}</Text>
     </Pressable>
@@ -202,8 +215,8 @@ export function KalendarzTerminu({
     <View style={style.warstwa}>
       <PasekDnia data={data} onZmiana={setData} />
 
-      <SiatkaDnia
-        dzien={data}
+      <SiatkaDni
+        dni={[data]}
         wizyty={zajete}
         przewinDo={przewinDo}
         tlo={tlo.panHandlers}
@@ -250,7 +263,7 @@ export function KalendarzTerminu({
             </View>
           </>
         )}
-      </SiatkaDnia>
+      </SiatkaDni>
 
       <View style={style.stopka}>
         <View style={style.stopkaOpis}>
@@ -284,6 +297,10 @@ const style = StyleSheet.create({
     minHeight: CEL_DOTYKU,
   },
   wierszWcisniety: { backgroundColor: Kolory.akcentTlo },
+  // Pusty termin ma wygladac jak brakujaca odpowiedz, a nie jak ozdobnik.
+  wierszPusty: { borderColor: Kolory.obramowanieMocne, borderStyle: 'dashed' },
+  wierszDzienPusty: { color: Kolory.tekstDrugi },
+  gwiazdka: { color: Kolory.pilne },
   wierszTresc: { flex: 1, minWidth: 0 },
   wierszDzien: { fontSize: s(15), fontWeight: '700', color: Kolory.tekst },
   wierszGodziny: { fontSize: s(13), color: Kolory.tekstDrugi, marginTop: 2 },

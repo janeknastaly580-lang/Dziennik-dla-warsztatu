@@ -18,7 +18,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { usePelnaSzerokosc } from '../komponenty/KolumnaEkranu';
 import PasekDnia from '../komponenty/PasekDnia';
 import SiatkaDni from '../komponenty/SiatkaDni';
 import { wizytyZakresu } from '../dane/repozytorium';
@@ -32,9 +31,6 @@ const DNI_W_WIDOKU = 4;
 const DOMYSLNA_GODZINA = 8 * 60;
 
 export default function EkranKalendarza() {
-  // Cztery dni obok siebie potrzebuja calego okna, a nie waskiej kolumny.
-  usePelnaSzerokosc();
-
   const router = useRouter();
   const parametry = useLocalSearchParams<{ data?: string; wizyta?: string }>();
   const wyrozniona = String(parametry.wizyta ?? '') || null;

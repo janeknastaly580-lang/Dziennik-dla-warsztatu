@@ -20,21 +20,10 @@ import { Ladowanie } from '../../komponenty/Stany';
 import { profilKlienta, zaktualizujKlienta } from '../../dane/repozytorium';
 import { odswiezLicznikiKolejki } from '../../dane/synchronizacja';
 import { Kolory, Odstepy } from '../../motyw';
+import { POLA_KLIENTA, PUSTY_KLIENT, type WartosciKlienta } from '../../polaKlienta';
 import { s } from '../../uklad';
 
-const POLA = [
-  { klucz: 'nazwa', etykieta: 'Imie i nazwisko / nazwa firmy', wymagane: true },
-  { klucz: 'telefon', etykieta: 'Telefon', klawiatura: 'phone-pad' as const },
-  { klucz: 'email', etykieta: 'E-mail', klawiatura: 'email-address' as const },
-  { klucz: 'adres', etykieta: 'Adres' },
-  { klucz: 'nip', etykieta: 'NIP (firma)', klawiatura: 'number-pad' as const },
-  { klucz: 'notatki', etykieta: 'Notatki', wiele: true },
-] as const;
-
-type Klucz = (typeof POLA)[number]['klucz'];
-type Wartosci = Record<Klucz, string>;
-
-const PUSTE: Wartosci = { nazwa: '', telefon: '', email: '', adres: '', nip: '', notatki: '' };
+type Wartosci = WartosciKlienta;
 
 export default function EkranEdycjiKlienta() {
   const router = useRouter();
@@ -42,7 +31,7 @@ export default function EkranEdycjiKlienta() {
   const klientId = String(id ?? '');
 
   const [poczatkowe, setPoczatkowe] = useState<Wartosci | null>(null);
-  const [wartosci, setWartosci] = useState<Wartosci>(PUSTE);
+  const [wartosci, setWartosci] = useState<Wartosci>(PUSTY_KLIENT);
   const [zapisywanie, setZapisywanie] = useState(false);
   const [blad, setBlad] = useState<string | null>(null);
   const [pytanie, setPytanie] = useState(false);
@@ -68,12 +57,12 @@ export default function EkranEdycjiKlienta() {
   /** Lista zmian do pokazania w pytaniu "czy na pewno". */
   const zmiany = useMemo(() => {
     if (!poczatkowe) return [];
-    return POLA
-      .filter((p) => wartosci[p.klucz].trim() !== poczatkowe[p.klucz].trim())
-      .map((p) => ({
-        etykieta: p.etykieta,
-        z: poczatkowe[p.klucz].trim() || '(puste)',
-        na: wartosci[p.klucz].trim() || '(puste)',
+    return POLA_KLIENTA
+      .filter((pole) => wartosci[pole.klucz].trim() !== poczatkowe[pole.klucz].trim())
+      .map((pole) => ({
+        etykieta: pole.etykieta,
+        z: poczatkowe[pole.klucz].trim() || '(puste)',
+        na: wartosci[pole.klucz].trim() || '(puste)',
       }));
   }, [poczatkowe, wartosci]);
 
@@ -125,16 +114,16 @@ export default function EkranEdycjiKlienta() {
         <KomunikatFormularza tresc={blad} />
 
         <Sekcja tytul="DANE KLIENTA">
-          {POLA.map((p) => (
+          {POLA_KLIENTA.map((pole) => (
             <Pole
-              key={p.klucz}
-              etykieta={p.etykieta}
-              wymagane={'wymagane' in p ? p.wymagane : undefined}
-              value={wartosci[p.klucz]}
-              onChangeText={(t) => setWartosci((w) => ({ ...w, [p.klucz]: t }))}
-              keyboardType={'klawiatura' in p ? p.klawiatura : undefined}
-              autoCapitalize={p.klucz === 'email' ? 'none' : 'sentences'}
-              multiline={'wiele' in p ? p.wiele : undefined}
+              key={pole.klucz}
+              etykieta={pole.etykieta}
+              wymagane={'wymagane' in pole ? pole.wymagane : undefined}
+              value={wartosci[pole.klucz]}
+              onChangeText={(t) => setWartosci((w) => ({ ...w, [pole.klucz]: t }))}
+              keyboardType={'klawiatura' in pole ? pole.klawiatura : undefined}
+              autoCapitalize={'bezWielkichLiter' in pole ? 'none' : 'sentences'}
+              multiline={'wiele' in pole ? pole.wiele : undefined}
             />
           ))}
         </Sekcja>

@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  FlatList, Pressable, RefreshControl, StyleSheet, Text, View,
+  FlatList, Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 
@@ -24,7 +24,9 @@ import { listaKlientow } from '../dane/repozytorium';
 import { useAplikacja } from '../dane/kontekst';
 import { doPorownania, odmiana } from '../format';
 import { Kolory, Odstepy, Zaokraglenia } from '../motyw';
-import { s, wys } from '../uklad';
+import {
+  SZEROKOSC_TRESCI, dopelnijWiersz, kolumnyKafelkow, pewneWymiary, s, wys,
+} from '../uklad';
 import type { KlientNaLiscie } from '../typy';
 
 /**
@@ -47,6 +49,10 @@ function IkonaKalendarza() {
 
 export default function EkranListyKlientow() {
   const router = useRouter();
+  // Na szerokim oknie kafelki ida obok siebie - jeden slup kartotek przez
+  // srodek monitora marnowalby cala reszte ekranu.
+  const { width } = pewneWymiary(useWindowDimensions());
+  const kolumny = kolumnyKafelkow(width);
   const { synchronizuj, czyAdministrator } = useAplikacja();
 
   const [klienci, setKlienci] = useState<KlientNaLiscie[]>([]);
@@ -160,6 +166,7 @@ export default function EkranListyKlientow() {
       {naglowekEkranu}
 
       <View style={style.gora}>
+        <View style={style.goraTresc}>
         <PoleWyszukiwania wartosc={fraza} onZmiana={setFraza} />
 
         <View style={style.pasekInformacji}>
@@ -184,13 +191,22 @@ export default function EkranListyKlientow() {
             </Pressable>
           ) : null}
         </View>
+        </View>
       </View>
 
       <FlatList
-        data={widoczni}
-        keyExtractor={(k) => k.id}
+        data={dopelnijWiersz(widoczni, kolumny)}
+        keyExtractor={(k, i) => k?.id ?? `pusty-${i}`}
+        // Zmiana liczby kolumn wymaga nowej listy - stad klucz.
+        key={`kolumny-${kolumny}`}
+        numColumns={kolumny}
+        columnWrapperStyle={kolumny > 1 ? style.wiersz : undefined}
         renderItem={({ item }) => (
-          <KafelekKlienta klient={item} onPress={() => router.push(`/klient/${item.id}`)} />
+          <View style={style.komorka}>
+            {item ? (
+              <KafelekKlienta klient={item} onPress={() => router.push(`/klient/${item.id}`)} />
+            ) : null}
+          </View>
         )}
         contentContainerStyle={style.lista}
         keyboardShouldPersistTaps="handled"
@@ -224,6 +240,8 @@ export default function EkranListyKlientow() {
 
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
+  // Pasek wyszukiwania trzyma te sama szerokosc co siatka kafelkow ponizej.
+  goraTresc: { width: '100%', maxWidth: SZEROKOSC_TRESCI, alignSelf: 'center' },
   gora: {
     paddingHorizontal: Odstepy.l,
     paddingTop: Odstepy.m,
@@ -250,7 +268,12 @@ const style = StyleSheet.create({
   },
   plakietkaWcisnieta: { opacity: 0.7 },
   plakietkaTekst: { fontSize: s(11), fontWeight: '800', color: Kolory.pilne },
+  wiersz: { gap: Odstepy.m, alignItems: 'flex-start' },
+  komorka: { flex: 1, minWidth: 0 },
   lista: {
+    width: '100%',
+    maxWidth: SZEROKOSC_TRESCI,
+    alignSelf: 'center',
     padding: Odstepy.l,
     // Zapas na dole - ostatni klient nie chowa sie pod paskiem gestow.
     paddingBottom: wys(6, 32),

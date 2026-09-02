@@ -37,7 +37,7 @@ import {
 import {
   dlugosc, formatujCzasTrwania, formatujGodziny, terminWizyty,
 } from '../../termin';
-import { CEL_DOTYKU, s, wys } from '../../uklad';
+import { CEL_DOTYKU, SZEROKOSC_CZYTANIA, s, wys } from '../../uklad';
 import type { Status, Wizyta } from '../../typy';
 
 const STATUSY: { wartosc: Status; etykieta: string }[] = [
@@ -220,15 +220,17 @@ export default function EkranWizyty() {
           />
         </View>
 
-        {termin ? (
-          <Przycisk
-            tytul="Pokaz w kalendarzu"
-            wariant="drugi"
-            onPress={() => router.push(
-              `/kalendarz?data=${termin.data}&wizyta=${wizyta.id}`,
-            )}
-          />
-        ) : null}
+        {/* Przycisk stoi przy KAZDYM zgloszeniu. Zgloszenia zalozone przed
+            kalendarzem nie maja godzin - dla nich kalendarz otwiera po prostu
+            dzien przyjecia, zeby bylo widac, co tego dnia stoi w warsztacie. */}
+        <Przycisk
+          tytul="Pokaz w kalendarzu"
+          wariant="drugi"
+          onPress={() => router.push(
+            `/kalendarz?data=${termin?.data ?? String(wizyta.data_wizyty ?? '').slice(0, 10)}`
+            + `&wizyta=${wizyta.id}`,
+          )}
+        />
 
         <Przycisk
           tytul="Edytuj zgloszenie"
@@ -287,7 +289,14 @@ function Wiersz({ etykieta, wartosc }: { etykieta: string; wartosc: string }) {
 const style = StyleSheet.create({
   ekran: { flex: 1, backgroundColor: Kolory.tlo },
   przewijanie: { flex: 1 },
-  tresc: { padding: Odstepy.l, paddingBottom: wys(7, 32), gap: Odstepy.m },
+  tresc: {
+    padding: Odstepy.l,
+    paddingBottom: wys(7, 32),
+    gap: Odstepy.m,
+    width: '100%',
+    maxWidth: SZEROKOSC_CZYTANIA,
+    alignSelf: 'center',
+  },
 
   naglowek: {
     borderRadius: Zaokraglenia.l,

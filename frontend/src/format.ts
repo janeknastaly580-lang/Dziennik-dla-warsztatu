@@ -5,18 +5,37 @@ const POLSKIE_ZNAKI: Record<string, string> = {
   Ą: 'a', Ć: 'c', Ę: 'e', Ł: 'l', Ń: 'n', Ó: 'o', Ś: 's', Ź: 'z', Ż: 'z',
 };
 
+/** Male litery bez polskich znakow - wspolny poczatek obu porownan nizej. */
+function bezOgonkow(tekst?: string | null): string {
+  if (!tekst) return '';
+  let wynik = '';
+  for (const znak of String(tekst)) {
+    wynik += POLSKIE_ZNAKI[znak] ?? znak.toLowerCase();
+  }
+  return wynik;
+}
+
 /**
  * Sprowadza tekst do postaci porownywalnej: male litery, bez polskich
  * znakow diakrytycznych i bez spacji/myslnikow. Dzieki temu "zielinska"
  * znajduje "Zielińska", a "kr12345" znajduje "KR 12345".
  */
 export function doPorownania(tekst?: string | null): string {
-  if (!tekst) return '';
-  let wynik = '';
-  for (const znak of String(tekst)) {
-    wynik += POLSKIE_ZNAKI[znak] ?? znak.toLowerCase();
-  }
-  return wynik.replace(/[\s\-_.()]/g, '');
+  return bezOgonkow(tekst).replace(/[\s\-_.()]/g, '');
+}
+
+/**
+ * Ostrzejsza odmiana: zostaja WYLACZNIE litery i cyfry. Uzywana tam, gdzie
+ * dwa zapisy tej samej rzeczy maja wyjsc na rowne - przy szukaniu duplikatow
+ * kartotek i tego samego auta ("VW/Passat" = "VW Passat").
+ */
+export function doPorownaniaScisle(tekst?: string | null): string {
+  return bezOgonkow(tekst).replace(/[^a-z0-9]/g, '');
+}
+
+/** Ostatnie dziewiec cyfr numeru - polski numer bez prefiksu kraju. */
+export function samCyfry(tekst?: string | null): string {
+  return String(tekst ?? '').replace(/[^0-9]/g, '').slice(-9);
 }
 
 /** '2026-08-12' -> '12.08.2026' */
@@ -36,14 +55,6 @@ export function formatujPrzebieg(km?: number | null): string | null {
 export function formatujKwote(kwota?: number | null): string | null {
   if (kwota === null || kwota === undefined) return null;
   return `${kwota.toFixed(2).replace('.', ',')} zl`;
-}
-
-/** 1536000 -> '1,5 MB' */
-export function formatujRozmiar(bajty?: number | null): string {
-  if (!bajty) return '-';
-  if (bajty < 1024) return `${bajty} B`;
-  if (bajty < 1024 * 1024) return `${(bajty / 1024).toFixed(0)} kB`;
-  return `${(bajty / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
 }
 
 /**

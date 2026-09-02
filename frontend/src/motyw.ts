@@ -6,7 +6,7 @@
  * przez kafelki historii wizyt.
  *
  * Wszystkie odstepy i czcionki przechodza przez skale z `uklad.ts`, wiec
- * proporcje interfejsu sa te same w kazdym oknie o ukladzie ~9:16.
+ * proporcje interfejsu sa te same przy kazdym rozmiarze okna.
  */
 import { s } from './uklad';
 
@@ -140,6 +140,22 @@ export function czyOtwarta(status: string): boolean {
   return status !== 'naprawione';
 }
 
+/**
+ * Priorytety w jednym miejscu: i jako opcje do wyboru w formularzach,
+ * i jako etykieta do pokazania. Wczesniej ta sama lista stala w dwoch
+ * ekranach wizyty i w trzeciej postaci w odznace kafelka.
+ */
+export const PRIORYTETY = [
+  { wartosc: 'niski' as const, etykieta: 'Niski' },
+  { wartosc: 'normalny' as const, etykieta: 'Normalny' },
+  { wartosc: 'wysoki' as const, etykieta: 'Wysoki', kolor: Kolory.pilne },
+];
+
+/** 'wysoki' -> 'Wysoki'. Uzywane na liscie zmian przed zapisem. */
+export const etykietaPriorytetu = (priorytet?: string | null): string =>
+  PRIORYTETY.find((p) => p.wartosc === priorytet)?.etykieta ?? '-';
+
+/** Odznaka na kafelku krzyczy tylko przy priorytecie wysokim. */
 export const ETYKIETA_PRIORYTETU: Record<string, string> = {
   niski: 'niski',
   normalny: 'normalny',

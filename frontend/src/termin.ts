@@ -11,10 +11,11 @@
  */
 
 /** Do czego przyciaga sie przeciaganie na siatce. */
-export const KROK = 15;
+const KROK = 15;
 /** Krotsza wizyta nie ma sensu i znika z siatki. */
 export const MIN_DLUGOSC = 15;
-export const DOMYSLNA_DLUGOSC = 60;
+/** Dlugosc, jaka dostaje swiezo zakladana wizyta. */
+const DOMYSLNA_DLUGOSC = 60;
 export const DZIEN = 24 * 60;
 
 export type Termin = {
@@ -55,7 +56,7 @@ function naDate(data: string): Date {
   return new Date(rok || 1970, (miesiac || 1) - 1, dzien || 1);
 }
 
-export const naTekstDaty = (d: Date): string =>
+const naTekstDaty = (d: Date): string =>
   `${d.getFullYear()}-${dwie(d.getMonth() + 1)}-${dwie(d.getDate())}`;
 
 export const dzisiaj = (): string => naTekstDaty(new Date());
@@ -105,16 +106,16 @@ export function etykietaDnia(data: string): string {
   return `${DNI[d.getDay()]} ${d.getDate()} ${MIESIACE[d.getMonth()]}`;
 }
 
+/** '2026-09-02' -> 'sr 2.09' - uzywane w opisie terminu na liscie zmian. */
+function etykietaKrotka(data: string): string {
+  const d = naDate(data);
+  return `${DNI[d.getDay()]} ${d.getDate()}.${dwie(d.getMonth() + 1)}`;
+}
+
 /** '2026-09-02' -> 'sr 2' - naglowek kolumny w kalendarzu kilku dni. */
 export function etykietaKolumny(data: string): string {
   const d = naDate(data);
   return `${DNI[d.getDay()]} ${d.getDate()}`;
-}
-
-/** '2026-09-02' -> 'sr 2.09' */
-export function etykietaKrotka(data: string): string {
-  const d = naDate(data);
-  return `${DNI[d.getDay()]} ${d.getDate()}.${dwie(d.getMonth() + 1)}`;
 }
 
 /* --------------------------- siatka miesiaca -------------------------- */
